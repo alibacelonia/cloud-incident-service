@@ -3,22 +3,29 @@ import socket
 import pytest
 from fastapi.testclient import TestClient
 
+from cloud_incident_service.application import InvestigationService
 from cloud_incident_service.config import ConfigurationError
-from cloud_incident_service.main import app, get_provider
+from cloud_incident_service.domain import Findings, IncidentRequest, Provenance
+from cloud_incident_service.main import app, get_investigation_service
 from cloud_incident_service.providers import ProviderInvocationError
 
+INVESTIGATION = {
+    "service": "payments-api",
+    "environment": "production",
+    "symptoms": "Elevated 5xx errors",
+    "time_range": {"start": "2026-10-19T10:00:00Z", "end": "2026-10-19T11:00:00Z"},
+}
 
-class FakeProvider:
-    async def generate(self, prompt: str) -> str:
-        assert "User input:" in prompt
-        return "controlled-test-output"
 
+class RaisingOrchestrator:
+    """Stands in for a model-backed orchestrator whose provider or settings fail."""
 
-class FailingProvider:
-    def __init__(self, error: ProviderInvocationError) -> None:
+    provenance = Provenance(orchestrator="model", model="example.model-v1:0")
+
+    def __init__(self, error: Exception) -> None:
         self.error = error
 
-    async def generate(self, prompt: str) -> str:
+    async def investigate(self, request: IncidentRequest) -> Findings:
         raise self.error
 
 
@@ -59,29 +66,18 @@ def test_health_is_ok_for_complete_bedrock_settings(client: TestClient, monkeypa
     assert response.json()["provider"] == "bedrock"
 
 
-def test_generate_uses_injected_provider(client: TestClient) -> None:
-    app.dependency_overrides[get_provider] = lambda: FakeProvider()
-
-    response = client.post("/v1/generate", json={"input": "hello"})
-
-    assert response.status_code == 200
-    assert response.json() == {"output": "controlled-test-output"}
+def use_orchestrator(orchestrator) -> None:
+    app.dependency_overrides[get_investigation_service] = lambda: InvestigationService(orchestrator)
 
 
-def test_generate_validates_empty_input(client: TestClient) -> None:
-    response = client.post("/v1/generate", json={"input": ""})
+def test_configuration_error_at_request_time_returns_503(client: TestClient) -> None:
+    use_orchestrator(RaisingOrchestrator(ConfigurationError(["AI_MODEL: example problem"])))
 
-    assert response.status_code == 422
-
-
-def test_unknown_provider_is_reported_without_network(client: TestClient, monkeypatch) -> None:
-    monkeypatch.setenv("AI_PROVIDER", "unknown")
-
-    response = client.post("/v1/generate", json={"input": "hello"})
+    response = client.post("/v1/investigations", json=INVESTIGATION)
 
     assert response.status_code == 503
     assert response.json() == {
-        "detail": "Invalid configuration: AI_PROVIDER: Input should be 'mock' or 'bedrock'",
+        "detail": "Invalid configuration: AI_MODEL: example problem",
         "code": "configuration_invalid",
     }
 
@@ -91,12 +87,33 @@ def test_provider_failures_return_safe_error(
     client: TestClient, unavailable: bool, status_code: int
 ) -> None:
     error = ProviderInvocationError("provider_example", "Safe message.", unavailable=unavailable)
-    app.dependency_overrides[get_provider] = lambda: FailingProvider(error)
+    use_orchestrator(RaisingOrchestrator(error))
 
-    response = client.post("/v1/generate", json={"input": "hello"})
+    response = client.post("/v1/investigations", json=INVESTIGATION)
 
     assert response.status_code == status_code
     assert response.json() == {"detail": "Safe message.", "code": "provider_example"}
+
+
+@pytest.mark.parametrize(
+    ("method", "path"),
+    [
+        ("post", "/v1/generate"),
+        ("post", "/v1/rag"),
+        ("post", "/v1/documents"),
+        ("post", "/v1/documents/preview"),
+    ],
+)
+def test_starter_endpoints_are_removed(client: TestClient, method: str, path: str) -> None:
+    response = client.request(method, path, json={"input": "hello"})
+
+    assert response.status_code == 404
+
+
+def test_openapi_lists_only_supported_routes(client: TestClient) -> None:
+    paths = client.get("/openapi.json").json()["paths"]
+
+    assert sorted(paths) == ["/health", "/v1/investigations"]
 
 
 def test_startup_fails_on_invalid_configuration(monkeypatch) -> None:

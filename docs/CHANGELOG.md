@@ -11,3 +11,4 @@ All notable project changes are recorded here.
 - Block network access in the default test suite.
 - Add `POST /v1/investigations`, which validates incident requests (FR-1) and returns a schema-validated incident report. Reports are `partial` until evidence sources are added.
 - Add incident domain models with FR-5 cross-reference validation.
+- Remove the starter endpoints `/v1/generate`, `/v1/rag`, `/v1/documents`, and `/v1/documents/preview` and the in-memory document store (D-4). Runbook retrieval returns in F-05 behind `runbook_search`.

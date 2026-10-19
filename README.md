@@ -17,9 +17,6 @@ Open `http://localhost:8000/docs` or call:
 
 ```bash
 curl http://localhost:8000/health
-curl -X POST http://localhost:8000/v1/generate \
-  -H 'content-type: application/json' \
-  -d '{"input":"Summarize the local starter"}'
 ```
 
 Start an incident investigation:
@@ -35,7 +32,7 @@ has `"status": "partial"` and an uncertainty stating that no sources were querie
 (unknown environment, timestamps without a UTC offset, `end` not after `start`, a window over 24
 hours, or unknown fields) returns HTTP 422.
 
-The default `mock` provider is deterministic and needs no API key. Prompt templates live under `src/cloud_incident_service/prompts/`. Selected external providers are initialized lazily and their credentials stay in environment variables.
+The default `mock` provider is deterministic and needs no API key. Prompt templates live under `src/cloud_incident_service/prompts/` and are not used until model-driven investigations arrive. Selected external providers are initialized lazily and their credentials stay in environment variables.
 
 ## Configuration
 
@@ -51,7 +48,7 @@ printed). `GET /health` returns 200 with `"status": "ok"` when settings are vali
 `"status": "misconfigured"` and the same messages. It makes no network call, so AWS credentials
 are only checked on the first model call.
 
-Provider failures return a JSON body with a stable `code` and a safe `detail`:
+Once investigations call a model, provider failures return a JSON body with a stable `code` and a safe `detail`:
 
 | Status | Codes |
 | --- | --- |

@@ -13,7 +13,7 @@
 
 ## Current baseline
 
-- `main.py` defines HTTP boundaries, dependency injection, startup validation (lifespan), the
+- `main.py` exposes only `GET /health` and `POST /v1/investigations`. It defines HTTP boundaries, dependency injection, startup validation (lifespan), the
   `/health` readiness check, and error mapping.
 - `config.py` validates settings from the environment and raises `ConfigurationError` (ADR-008).
 - `domain/` holds the incident request and report models. `Findings` is what an orchestrator
@@ -27,8 +27,6 @@
   and the Bedrock adapter in `providers/bedrock.py`, which translates SDK failures into
   `ProviderInvocationError`.
 - `prompts/` stores prompt text outside Python code.
-- An in-memory retrieval seam provides deterministic local RAG behaviour and can later be replaced
-  behind the same boundary.
 
 Known gaps against the target: no tool registry, correlation, trace, or evaluation harness. The provider protocol supports text only, not tool use.
 
@@ -93,8 +91,8 @@ tests/
   trace recorder are constructor dependencies; `InvestigationService` turns findings into an
   `IncidentReport`.
 - `ModelClient`: `async converse(system, messages, tools, limits) -> ModelTurn`, where `ModelTurn`
-  is either text or tool-use requests plus token usage. The existing `AIProvider` remains only while
-  the starter endpoints exist [D-4].
+  is either text or tool-use requests plus token usage. The starter endpoints were removed in F-03 (D-4); `AIProvider`
+  now serves only startup and `/health` checks until `ModelClient` replaces it in F-09.
 - `RunbookRetriever`: `search(query, limit) -> list[RunbookSection]`.
 - `TraceSink`: `write(trace)`, with a file-based implementation and an in-memory one for tests.
 
