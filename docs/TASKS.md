@@ -23,7 +23,7 @@ Each feature is a vertical slice that can be observed through the API or the tes
 | --- | --- | --- | --- | --- | --- |
 | T-00 | P0 | done | Generate the starter application | none | Application and tests are present |
 | T-01 | P0 | done | Refine product requirements | none | `docs/PROJECT.md` v1 approved 2026-10-19; D-1 to D-7 and A-1 to A-7 resolved; ADR-002 to ADR-007 accepted |
-| F-01 | P0 | in-progress (awaiting owner verification) | Configuration validation, readiness, and provider error handling | T-01 | AC-16 (NFR-8); Bedrock calls run off the event loop (NFR-4); a socket-blocking guard fails any default test that opens a network connection (NFR-1) |
+| F-01 | P0 | done | Configuration validation, readiness, and provider error handling | T-01 | AC-16 (NFR-8); Bedrock calls run off the event loop (NFR-4); a socket-blocking guard fails any default test that opens a network connection (NFR-1) |
 | F-02 | P0 | todo | Incident intake walking skeleton: domain models, `InvestigationService`, and `POST /v1/investigations` returning a valid `partial` report when no tools are registered | F-01 | AC-1, AC-2; unit tests for every FR-5 validation rule (uncited facts, unknown evidence identifiers, `requires_human_approval=false` rejected) |
 | F-03 | P0 | todo | Remove the starter endpoints (D-4) | F-02 | `/v1/generate`, `/v1/rag`, `/v1/documents`, and `/v1/documents/preview` return 404; their tests and README examples are removed |
 | F-04 | P0 | todo | Read-only tool registry, synthetic fixtures, and the three signal and change tools wired into the deterministic orchestrator | F-02, D-8 | AC-6, AC-8, AC-13; reports list evidence, timeline, and `data_sources`; A-3 look-back applied; repeated calls return identical output |
