@@ -5,7 +5,8 @@
 > decision; both are listed at the end of this document. `docs/HANDOFF.md` is
 > context only; this document and `project.yaml` are authoritative.
 >
-> **Implementation:** all MVP features (F-01 to F-11) are delivered; see `docs/TASKS.md`. Live
+> **Implementation:** MVP complete (2026-10-19); all features F-01 to F-11 are delivered and
+> verified by the owner; see `docs/TASKS.md`. Live
 > Bedrock results depend on the owner's account and are not part of the default test suite.
 
 ## Project overview
