@@ -19,16 +19,22 @@
 - `domain/` holds the incident request and report models. `Findings` is what an orchestrator
   concludes; `IncidentReport` extends it with identity, request, and provenance, and adds the
   request-scoped checks. Cross-reference rules (FR-5) are model validators.
-- `application/` contains `InvestigationService`, which assigns the investigation ID and timestamp
-  and assembles the validated report.
-- `orchestration/` defines the `Orchestrator` protocol and a `DeterministicOrchestrator` that has no
-  evidence sources yet and returns a `partial` report.
+- `application/` contains `InvestigationService`, which opens a `ToolSession` per investigation,
+  assigns the investigation ID and timestamp, assembles the validated report, and rejects evidence
+  that no tool returned in that session (FR-5 rule 1, ADR-009).
+- `orchestration/` defines the `Orchestrator` protocol and a `DeterministicOrchestrator` that
+  queries every registered tool once and reports evidence, timeline, data-source status, and
+  uncertainties for empty or failed sources. Correlated findings arrive in F-06.
+- `tools/` holds the read-only `ToolRegistry` and `ToolSession` and three fixture-backed tools:
+  `cloudwatch_signals`, `deployment_history`, and `infrastructure_changes` (D-8). Change tools apply
+  the 60-minute look-back (A-3).
+- `fixtures/` contains the synthetic JSON data, checked by a hygiene test (SEC-5).
 - `providers/` defines the provider protocol (`AIProvider.generate(prompt) -> str`), an offline mock,
   and the Bedrock adapter in `providers/bedrock.py`, which translates SDK failures into
   `ProviderInvocationError`.
 - `prompts/` stores prompt text outside Python code.
 
-Known gaps against the target: no tool registry, correlation, trace, or evaluation harness. The provider protocol supports text only, not tool use.
+Known gaps against the target: no runbook retrieval, correlation, trace, or evaluation harness. The provider protocol supports text only, not tool use.
 
 ## Target MVP architecture
 
@@ -83,13 +89,15 @@ tests/
 ### Key interfaces
 
 - `Tool`: `name`, `read_only: Literal[True]`, `input_model`, `output_model`, and
-  `async run(input) -> ToolResult`.
-- `ToolRegistry`: `register(tool)` rejects non-read-only tools; `invoke(name, raw_input)` validates
-  input, refuses unknown names, enforces a per-tool timeout, and converts exceptions or invalid
-  output into `unavailable` or `malformed` results.
-- `Orchestrator`: `provenance` plus `async investigate(request) -> Findings`. The registry and
-  trace recorder are constructor dependencies; `InvestigationService` turns findings into an
-  `IncidentReport`.
+  `async run(query) -> raw output`. The registry validates the raw output against `output_model`
+  (a `ToolOutput` that converts its records to evidence).
+- `ToolRegistry`: `register(tool)` rejects non-read-only and duplicate tools; `session()` opens a
+  `ToolSession` for one investigation.
+- `ToolSession`: `invoke(name, arguments) -> ToolResult` refuses unknown names and invalid arguments
+  without running anything, enforces a per-tool timeout (5 s), converts exceptions to
+  `unavailable` and invalid output to `malformed`, and records results and returned evidence.
+- `Orchestrator`: `provenance` plus `async investigate(request, tools: ToolSession) -> Findings`.
+  `InvestigationService` turns findings into an `IncidentReport`.
 - `ModelClient`: `async converse(system, messages, tools, limits) -> ModelTurn`, where `ModelTurn`
   is either text or tool-use requests plus token usage. The starter endpoints were removed in F-03 (D-4); `AIProvider`
   now serves only startup and `/health` checks until `ModelClient` replaces it in F-09.

@@ -1,0 +1,152 @@
+{
+  "data_as_of": "2026-10-19T23:59:00Z",
+  "unavailable": [],
+  "alarms": [
+    {
+      "id": "a-pay-001",
+      "service": "payments-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T10:09:00Z",
+      "alarm_name": "payments-api-5xx-rate",
+      "previous_state": "OK",
+      "new_state": "ALARM",
+      "reason": "Threshold crossed: 3 datapoints above 2 percent"
+    },
+    {
+      "id": "a-pay-stg-001",
+      "service": "payments-api",
+      "environment": "staging",
+      "timestamp": "2026-10-19T10:30:00Z",
+      "alarm_name": "payments-api-5xx-rate",
+      "previous_state": "OK",
+      "new_state": "ALARM",
+      "reason": "Threshold crossed: 3 datapoints above 2 percent"
+    },
+    {
+      "id": "a-ord-001",
+      "service": "orders-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T10:15:00Z",
+      "alarm_name": "orders-api-latency-p99",
+      "previous_state": "OK",
+      "new_state": "ALARM",
+      "reason": "Threshold crossed: p99 latency above 1500 ms"
+    },
+    {
+      "id": "a-chk-001",
+      "service": "checkout-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T14:02:00Z",
+      "alarm_name": "checkout-api-db-errors",
+      "previous_state": "OK",
+      "new_state": "ALARM",
+      "reason": "Database connection errors above 5 per minute"
+    },
+    {
+      "id": "a-inv-001",
+      "service": "inventory-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T16:10:00Z",
+      "alarm_name": "inventory-api-latency-p99",
+      "previous_state": "OK",
+      "new_state": "ALARM",
+      "reason": "Threshold crossed: p99 latency above 800 ms"
+    }
+  ],
+  "metrics": [
+    {
+      "id": "m-pay-001",
+      "service": "payments-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T09:55:00Z",
+      "metric_name": "HTTP5xxRate",
+      "statistic": "Average",
+      "value": 0.3,
+      "unit": "Percent"
+    },
+    {
+      "id": "m-pay-002",
+      "service": "payments-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T10:00:00Z",
+      "metric_name": "HTTP5xxRate",
+      "statistic": "Average",
+      "value": 0.4,
+      "unit": "Percent"
+    },
+    {
+      "id": "m-pay-003",
+      "service": "payments-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T10:10:00Z",
+      "metric_name": "HTTP5xxRate",
+      "statistic": "Average",
+      "value": 7.2,
+      "unit": "Percent"
+    },
+    {
+      "id": "m-pay-004",
+      "service": "payments-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T10:10:00Z",
+      "metric_name": "Latency",
+      "statistic": "p99",
+      "value": 2400,
+      "unit": "Milliseconds"
+    },
+    {
+      "id": "m-chk-001",
+      "service": "checkout-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T14:05:00Z",
+      "metric_name": "DatabaseConnectionErrors",
+      "statistic": "Sum",
+      "value": 42,
+      "unit": "Count"
+    },
+    {
+      "id": "m-led-001",
+      "service": "ledger-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T18:05:00Z",
+      "metric_name": "HTTP5xxRate",
+      "statistic": "Average",
+      "value": 3.1,
+      "unit": "Percent"
+    }
+  ],
+  "logs": [
+    {
+      "id": "l-pay-001",
+      "service": "payments-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T10:09:30Z",
+      "level": "ERROR",
+      "message": "Timeout calling ledger-service after 2000 ms"
+    },
+    {
+      "id": "l-pay-002",
+      "service": "payments-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T10:11:00Z",
+      "level": "ERROR",
+      "message": "Connection pool exhausted (max=20)"
+    },
+    {
+      "id": "l-ord-001",
+      "service": "orders-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T10:16:00Z",
+      "level": "WARN",
+      "message": "Slow response from inventory lookup"
+    },
+    {
+      "id": "l-chk-001",
+      "service": "checkout-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T14:01:30Z",
+      "level": "ERROR",
+      "message": "Could not connect to checkout-db on port 5432: connection timed out"
+    }
+  ]
+}

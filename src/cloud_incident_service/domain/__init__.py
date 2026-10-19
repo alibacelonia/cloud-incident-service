@@ -13,6 +13,7 @@ from cloud_incident_service.domain.report import (
     Uncertainty,
 )
 from cloud_incident_service.domain.request import IncidentRequest, TimeRange
+from cloud_incident_service.domain.tool_result import ToolResult, ToolStatus
 
 __all__ = [
     "DataSource",
@@ -26,5 +27,7 @@ __all__ = [
     "Provenance",
     "RemediationProposal",
     "TimeRange",
+    "ToolResult",
+    "ToolStatus",
     "Uncertainty",
 ]

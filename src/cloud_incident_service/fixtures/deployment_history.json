@@ -1,0 +1,66 @@
+{
+  "data_as_of": "2026-10-19T23:59:00Z",
+  "unavailable": ["inventory-api/production"],
+  "deployments": [
+    {
+      "id": "d-0039",
+      "service": "payments-api",
+      "environment": "production",
+      "version": "1.7.3",
+      "previous_version": "1.7.2",
+      "status": "succeeded",
+      "started_at": "2026-10-19T08:30:00Z",
+      "finished_at": "2026-10-19T08:34:00Z"
+    },
+    {
+      "id": "d-0042",
+      "service": "payments-api",
+      "environment": "production",
+      "version": "1.8.0",
+      "previous_version": "1.7.3",
+      "status": "succeeded",
+      "started_at": "2026-10-19T10:05:00Z",
+      "finished_at": "2026-10-19T10:08:00Z"
+    },
+    {
+      "id": "d-0041",
+      "service": "payments-api",
+      "environment": "staging",
+      "version": "1.8.0",
+      "previous_version": "1.7.3",
+      "status": "succeeded",
+      "started_at": "2026-10-19T10:20:00Z",
+      "finished_at": "2026-10-19T10:23:00Z"
+    },
+    {
+      "id": "d-0107",
+      "service": "orders-api",
+      "environment": "production",
+      "version": "4.2.1",
+      "previous_version": "4.2.0",
+      "status": "succeeded",
+      "started_at": "2026-10-19T10:12:00Z",
+      "finished_at": "2026-10-19T10:14:00Z"
+    },
+    {
+      "id": "d-0300",
+      "service": "inventory-api",
+      "environment": "production",
+      "version": "3.1.0",
+      "previous_version": "3.0.9",
+      "status": "succeeded",
+      "started_at": "2026-10-19T16:00:00Z",
+      "finished_at": "2026-10-19T16:03:00Z"
+    },
+    {
+      "id": "d-0201",
+      "service": "ledger-api",
+      "environment": "production",
+      "version": "2.0.0",
+      "previous_version": "1.9.4",
+      "status": "exploded",
+      "started_at": "2026-10-19T18:02:00Z",
+      "finished_at": "2026-10-19T18:04:00Z"
+    }
+  ]
+}

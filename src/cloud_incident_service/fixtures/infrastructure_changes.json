@@ -1,0 +1,46 @@
+{
+  "data_as_of": "2026-10-19T23:59:00Z",
+  "unavailable": [],
+  "changes": [
+    {
+      "id": "c-0501",
+      "service": "checkout-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T12:30:00Z",
+      "resource_type": "ssm_parameter",
+      "resource_id": "/checkout/feature-flags",
+      "change_type": "modified",
+      "description": "Feature flag set updated"
+    },
+    {
+      "id": "c-0502",
+      "service": "checkout-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T13:40:00Z",
+      "resource_type": "security_group",
+      "resource_id": "sg-example-checkout-db",
+      "change_type": "modified",
+      "description": "Removed inbound rule allowing port 5432 from the application subnet"
+    },
+    {
+      "id": "c-0503",
+      "service": "orders-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T10:00:00Z",
+      "resource_type": "autoscaling_group",
+      "resource_id": "orders-api-asg",
+      "change_type": "modified",
+      "description": "Desired capacity changed from 6 to 4"
+    },
+    {
+      "id": "c-0504",
+      "service": "checkout-api",
+      "environment": "staging",
+      "timestamp": "2026-10-19T13:45:00Z",
+      "resource_type": "security_group",
+      "resource_id": "sg-example-checkout-db-staging",
+      "change_type": "modified",
+      "description": "Removed inbound rule allowing port 5432 from the application subnet"
+    }
+  ]
+}

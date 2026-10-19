@@ -8,6 +8,7 @@ from cloud_incident_service.config import ConfigurationError
 from cloud_incident_service.domain import Findings, IncidentRequest, Provenance
 from cloud_incident_service.main import app, get_investigation_service
 from cloud_incident_service.providers import ProviderInvocationError
+from cloud_incident_service.tools import ToolRegistry, ToolSession
 
 INVESTIGATION = {
     "service": "payments-api",
@@ -25,7 +26,7 @@ class RaisingOrchestrator:
     def __init__(self, error: Exception) -> None:
         self.error = error
 
-    async def investigate(self, request: IncidentRequest) -> Findings:
+    async def investigate(self, request: IncidentRequest, tools: ToolSession) -> Findings:
         raise self.error
 
 
@@ -67,7 +68,8 @@ def test_health_is_ok_for_complete_bedrock_settings(client: TestClient, monkeypa
 
 
 def use_orchestrator(orchestrator) -> None:
-    app.dependency_overrides[get_investigation_service] = lambda: InvestigationService(orchestrator)
+    service = InvestigationService(orchestrator, ToolRegistry())
+    app.dependency_overrides[get_investigation_service] = lambda: service
 
 
 def test_configuration_error_at_request_time_returns_503(client: TestClient) -> None:

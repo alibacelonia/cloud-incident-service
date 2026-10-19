@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from functools import lru_cache
 from typing import Literal
 
 from fastapi import Depends, FastAPI, Request, Response
@@ -14,6 +15,7 @@ from cloud_incident_service.config import ConfigurationError, Settings
 from cloud_incident_service.domain import IncidentReport, IncidentRequest
 from cloud_incident_service.orchestration import DeterministicOrchestrator
 from cloud_incident_service.providers import ProviderInvocationError, create_provider
+from cloud_incident_service.tools import ToolRegistry, build_default_registry
 
 logger = logging.getLogger(__name__)
 
@@ -74,8 +76,13 @@ def health(response: Response) -> HealthResponse:
     return HealthResponse(status="ok", provider=settings.provider)
 
 
+@lru_cache(maxsize=1)
+def default_registry() -> ToolRegistry:
+    return build_default_registry()
+
+
 def get_investigation_service() -> InvestigationService:
-    return InvestigationService(DeterministicOrchestrator())
+    return InvestigationService(DeterministicOrchestrator(), default_registry())
 
 
 @app.post("/v1/investigations", response_model=IncidentReport)

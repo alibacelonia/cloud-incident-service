@@ -2,7 +2,7 @@
 
 > **Status:** MVP requirements v1, **approved by the owner on 2026-10-19**.
 > Items tagged **[A-n]** follow a confirmed default and items tagged **[D-n]** follow a recorded
-> decision; both are listed at the end of this document. D-8 is still open. `docs/HANDOFF.md` is
+> decision; both are listed at the end of this document. `docs/HANDOFF.md` is
 > context only; this document and `project.yaml` are authoritative.
 
 ## Project overview
@@ -295,4 +295,4 @@ Approved by the owner on 2026-10-19.
 | D-5 | No authentication in the MVP. The service is documented as local-only (bind to `127.0.0.1`); authentication is a prerequisite for any non-local deployment. | Approved 2026-10-19 |
 | D-6 | The owner chooses the live evaluation thresholds, the Bedrock model, and the authorized personal AWS account before live tests run. Live evaluations report results and do not block CI. | Approved 2026-10-19; values needed before F-10 |
 | D-7 | Invalid model output gets one repair attempt with the validation errors. If it is still invalid, the API returns HTTP 502 `invalid_model_output` and the failure is recorded in the trace. | Approved 2026-10-19 |
-| D-8 | Tool naming. Recommendation: keep AWS-specific names (`cloudwatch_signals`, `deployment_history`, `infrastructure_changes`) because the product is AWS-focused. Generic names with AWS as one adapter would add indirection without a second provider. | **Open**; needed before F-04 |
+| D-8 | Tools keep AWS-specific names (`cloudwatch_signals`, `deployment_history`, `infrastructure_changes`, `runbook_search`) because the product is AWS-focused; no generic provider layer is added. | Approved 2026-10-19 |

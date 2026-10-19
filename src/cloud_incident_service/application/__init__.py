@@ -1,3 +1,6 @@
-from cloud_incident_service.application.investigation import InvestigationService
+from cloud_incident_service.application.investigation import (
+    InvestigationService,
+    UnverifiedEvidenceError,
+)
 
-__all__ = ["InvestigationService"]
+__all__ = ["InvestigationService", "UnverifiedEvidenceError"]
