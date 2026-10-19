@@ -42,7 +42,7 @@ Evaluation runner (evaluation/) -> InvestigationService over fixtures/evaluation
 | `correlation/` | Pure rules: abnormal signals and onset, changes within 30 minutes before onset (A-3), stale sources (A-4), contradictions via shared `entity` attributes (A-5), instruction-like text (ADR-012) |
 | `tools/` | `Tool` protocol, `ToolRegistry`, `ToolSession`, the four fixture-backed tools (D-8), runbook parsing and retrieval (D-1, ADR-007) |
 | `providers/` | `ModelClient` protocol and conversation types; `BedrockModelClient` with timeouts and safe error mapping |
-| `prompts/` | Versioned prompt templates (`investigation_v1.txt`) |
+| `prompts/` | Versioned prompt templates; `investigation_v2.txt` is current, earlier versions are kept for comparison |
 | `tracing/` | `InvestigationTrace`, `TraceRecorder`, `FileTraceSink`, `InMemoryTraceSink`, `TRACE_DIR` checks (D-3, ADR-006, ADR-011) |
 | `redaction.py` | Pattern-based secret redaction for tool output, symptoms, and traces (ADR-011) |
 | `fixtures/` | Synthetic tool data, runbooks, and evaluation scenarios (package data, hygiene-tested) |

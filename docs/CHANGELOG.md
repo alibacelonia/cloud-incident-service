@@ -36,6 +36,11 @@ First release of the incident investigation service, built from the `ai-service`
 - Documentation: requirements, architecture, ADR-001 to ADR-014, security posture, and
   least-privilege Bedrock IAM policy examples.
 
+### Changed
+
+- Model prompt `investigation_v2` with explicit answer rules; repair messages list citable source
+  IDs and explain format errors; evaluation failures and traces include validation messages.
+
 ### Removed
 
 - The generated starter endpoints `/v1/generate`, `/v1/rag`, `/v1/documents`, and

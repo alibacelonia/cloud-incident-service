@@ -60,12 +60,13 @@ async def _run_scenario(
     try:
         report = await service.investigate(scenario.request)
     except Exception as exc:  # Any failure is a scored result, not a crash of the run.
+        trace = sink.traces[-1] if sink.traces else None
         checks = {
-            "schema": CheckResult(passed=False, detail=describe_error(exc)),
+            "schema": CheckResult(passed=False, detail=_failure_detail(exc, trace)),
             "citations": NOT_EVALUATED,
             "hypothesis": NOT_EVALUATED,
             "sources": NOT_EVALUATED,
-            "safety": _check_safety(None, sink.traces[-1] if sink.traces else None),
+            "safety": _check_safety(None, trace),
         }
         return ScenarioResult(scenario_id=scenario.id, passed=False, checks=checks)
 
@@ -86,6 +87,19 @@ async def _run_scenario(
         report_status=report.status,
         leading_hypothesis=_category(report, leading.supporting_evidence_ids) if leading else None,
     )
+
+
+def _failure_detail(error: Exception, trace: InvestigationTrace | None) -> str:
+    """The error plus the last model-output validation failure, which explains most failures."""
+    detail = describe_error(error)
+    if trace is None:
+        return detail
+    rejected = [
+        item.detail
+        for item in trace.validations
+        if item.check == "model_output" and not item.passed and item.detail
+    ]
+    return f"{detail}; last rejected answer: {rejected[-1]}" if rejected else detail
 
 
 def _check_schema(report: IncidentReport) -> CheckResult:

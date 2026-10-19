@@ -17,7 +17,8 @@ from cloud_incident_service.tracing.models import (
     ValidationOutcome,
 )
 
-DETAIL_LIMIT = 300
+DETAIL_LIMIT = 600
+MAX_DETAILED_ERRORS = 5
 
 
 class TraceRecorder:
@@ -105,14 +106,19 @@ class TraceRecorder:
 
 
 def describe_error(error: Exception) -> str:
+    """A short, value-free description: error type or code, plus validation locations and
+    messages (Pydantic messages are requested without input values)."""
     if isinstance(error, ValidationError):
-        locations = sorted({".".join(str(part) for part in item["loc"]) for item in error.errors()})
-        detail = f"{error.error_count()} validation error(s) at {', '.join(locations) or 'root'}"
+        problems = [
+            f"{'.'.join(str(part) for part in item['loc']) or 'root'}: {item['msg']}"
+            for item in error.errors(include_input=False, include_url=False)[:MAX_DETAILED_ERRORS]
+        ]
+        detail = f"{error.error_count()} validation error(s): " + "; ".join(problems)
     else:
         code = getattr(error, "code", None)
         detail = (
             f"{type(error).__name__}: {code}"
             if isinstance(code, str)
-            else (f"{type(error).__name__}: {error}")
+            else f"{type(error).__name__}: {error}"
         )
     return redact_text(detail)[:DETAIL_LIMIT]

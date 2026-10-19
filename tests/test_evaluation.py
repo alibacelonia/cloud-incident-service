@@ -186,3 +186,29 @@ def test_cli_fails_below_minimum_pass_rate(monkeypatch, capsys) -> None:
 def test_cli_rejects_invalid_pass_rate() -> None:
     with pytest.raises(SystemExit):
         cli.main(["--min-pass-rate", "1.5"])
+
+
+def test_failed_model_answers_explain_the_last_rejection() -> None:
+    from cloud_incident_service.orchestration import ModelOrchestrator
+    from cloud_incident_service.providers import ModelTurn, TextBlock
+
+    class AlwaysInvalid:
+        model_id = "always-invalid"
+
+        async def converse(self, system, messages, tools, max_output_tokens):
+            return ModelTurn(
+                stop_reason="end_turn",
+                content=[
+                    TextBlock(
+                        text='{"summary": "x", "facts": [{"statement": "y", "evidence_ids": []}]}'
+                    )
+                ],
+            )
+
+    [result] = evaluate(
+        [scenario("faulty-deployment")], lambda: ModelOrchestrator(AlwaysInvalid())
+    ).results
+
+    detail = result.checks["schema"].detail
+    assert detail.startswith("ModelInvestigationError: invalid_model_output; last rejected answer:")
+    assert "facts.0.evidence_ids: List should have at least 1 item" in detail

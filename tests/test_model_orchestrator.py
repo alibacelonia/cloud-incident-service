@@ -3,6 +3,7 @@ import json
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 from cloud_incident_service.application import InvestigationService
 from cloud_incident_service.config import ConfigurationError, Settings
@@ -17,7 +18,12 @@ from cloud_incident_service.orchestration import (
     RuleBasedModelClient,
     build_orchestrator,
 )
-from cloud_incident_service.orchestration.model import UNTRUSTED_NOTE, extract_json
+from cloud_incident_service.orchestration.model import (
+    UNTRUSTED_NOTE,
+    ModelFindings,
+    extract_json,
+    repair_request,
+)
 from cloud_incident_service.providers import (
     Message,
     ModelTurn,
@@ -144,7 +150,7 @@ def test_model_driven_investigation_produces_validated_report() -> None:
     assert report.provenance.model_dump() == {
         "orchestrator": "model",
         "model": "scripted-model",
-        "prompt_version": "investigation_v1",
+        "prompt_version": "investigation_v2",
     }
     assert report.hypotheses[0].confidence == "medium"
     assert report.remediation_proposals[0].requires_human_approval is True
@@ -319,6 +325,85 @@ def test_one_repair_attempt_recovers_invalid_output(invalid) -> None:
     ]
 
 
+def test_repair_request_lists_the_citable_source_ids() -> None:
+    bad = GOOD_ANSWER | {"facts": [{"statement": "x", "evidence_ids": ["cloudwatch_signals"]}]}
+    client = ScriptedModelClient(INVESTIGATE, answer(bad), answer(GOOD_ANSWER))
+
+    investigate(client)
+
+    repair = client.calls[2][-1].content[0].text
+    assert "facts.0.evidence_ids.0: is not a source_id; copy a source_id exactly" in repair
+    assert "should match pattern" not in repair
+    assert "The only source_ids you may cite are: " in repair
+    assert "deploy:payments-api:d-0042" in repair
+
+
+def test_repair_request_without_evidence_says_findings_must_be_empty() -> None:
+    no_data = {"service": "search-api", "environment": "production", **WINDOW}
+    request = IncidentRequest.model_validate(
+        {
+            "service": "search-api",
+            "environment": "production",
+            "symptoms": "Timeouts",
+            "time_range": WINDOW,
+        }
+    )
+    bad = {"summary": "Nothing found.", "facts": [{"statement": "No data.", "evidence_ids": []}]}
+    good = {
+        "summary": "No evidence was found.",
+        "uncertainties": [{"description": "No data.", "evidence_ids": []}],
+    }
+    client = ScriptedModelClient(
+        tool_use(("cloudwatch_signals", no_data)), answer(bad), answer(good)
+    )
+
+    report, _ = investigate(client, request=request)
+
+    assert "facts and hypotheses must be empty lists" in client.calls[2][-1].content[0].text
+    assert report.facts == []
+
+
+def test_unknown_citation_is_explained_in_the_repair_request() -> None:
+    bad = GOOD_ANSWER | {
+        "facts": [{"statement": "x", "evidence_ids": ["deploy:payments-api:d-9999"]}],
+    }
+    client = ScriptedModelClient(INVESTIGATE, answer(bad), answer(GOOD_ANSWER))
+
+    investigate(client)
+
+    assert "references unknown evidence: deploy:payments-api:d-9999" in (
+        client.calls[2][-1].content[0].text
+    )
+
+
+def test_bad_hypothesis_id_is_explained_without_regex() -> None:
+    bad_id = json.loads(json.dumps(GOOD_ANSWER))
+    bad_id["hypotheses"][0]["id"] = "H1"
+    with pytest.raises(ValidationError) as raised:
+        ModelFindings.model_validate(bad_id)
+
+    message = repair_request(raised.value, ["deploy:payments-api:d-0042"])
+
+    assert 'hypotheses.0.id: is not a valid hypothesis id; use ids like "h-1"' in message
+    assert "pattern" not in message
+    assert message.endswith(
+        "The only source_ids you may cite are: deploy:payments-api:d-0042. "
+        "Reply again with only the corrected JSON object."
+    )
+
+
+def test_capitalized_confidence_and_risk_are_accepted() -> None:
+    shouted = json.loads(json.dumps(GOOD_ANSWER))
+    shouted["hypotheses"][0]["confidence"] = "Medium"
+    shouted["remediation_proposals"][0]["risk"] = " HIGH "
+    client = ScriptedModelClient(INVESTIGATE, answer(shouted))
+
+    report, _ = investigate(client)
+
+    assert report.hypotheses[0].confidence == "medium"
+    assert report.remediation_proposals[0].risk == "high"
+
+
 def test_cut_off_answer_triggers_repair() -> None:
     client = ScriptedModelClient(
         INVESTIGATE, answer('{"summary": "trunc', stop_reason="max_tokens"), answer(GOOD_ANSWER)
@@ -449,7 +534,7 @@ def test_api_runs_the_model_orchestrator_offline(monkeypatch) -> None:
     assert body["provenance"] == {
         "orchestrator": "model",
         "model": "rule-based-mock",
-        "prompt_version": "investigation_v1",
+        "prompt_version": "investigation_v2",
     }
     assert body["hypotheses"][0]["confidence"] == "high"
 
