@@ -52,7 +52,7 @@ All fixtures are fictional. Invalid input
 (unknown environment, timestamps without a UTC offset, `end` not after `start`, a window over 24
 hours, or unknown fields) returns HTTP 422.
 
-The default `mock` provider is deterministic and needs no API key. Prompt templates live under `src/cloud_incident_service/prompts/` and are not used until model-driven investigations arrive. Selected external providers are initialized lazily and their credentials stay in environment variables.
+The default `mock` provider is deterministic and needs no API key. Prompt templates live under `src/cloud_incident_service/prompts/`. Selected external providers are initialized lazily and their credentials stay in environment variables.
 
 ## Configuration
 
@@ -62,6 +62,8 @@ The default `mock` provider is deterministic and needs no API key. Prompt templa
 | `AI_MODEL` | Bedrock model or inference profile ID; required for `bedrock` | empty |
 | `AWS_REGION` | AWS region such as `us-east-1`; required for `bedrock` (`AWS_DEFAULT_REGION` is accepted as a fallback) | unset |
 | `TRACE_DIR` | Directory for investigation trace files, for example `.traces` (git-ignored); created at startup if missing | unset (no trace files) |
+| `ORCHESTRATOR` | `deterministic` (rule-based) or `model` (bounded model-driven loop) | `deterministic` |
+| `MODEL_MAX_OUTPUT_TOKENS` | Output-token cap per model turn, 256–8192 | `2048` |
 
 Settings are validated at startup. If any value is invalid, uvicorn exits with
 `Application startup failed` and a message naming each offending variable (values are never
@@ -69,12 +71,32 @@ printed). `GET /health` returns 200 with `"status": "ok"` when settings are vali
 `"status": "misconfigured"` and the same messages. It makes no network call, so AWS credentials
 are only checked on the first model call.
 
-Once investigations call a model, provider failures return a JSON body with a stable `code` and a safe `detail`:
+Provider and model-loop failures return a JSON body with a stable `code` and a safe `detail`:
 
 | Status | Codes |
 | --- | --- |
 | 503 | `configuration_invalid`, `provider_credentials_unavailable`, `provider_credentials_invalid`, `provider_access_denied`, `provider_throttled`, `provider_unavailable`, `provider_unreachable` |
-| 502 | `provider_request_rejected` (for example an unknown `AI_MODEL`), `provider_response_invalid`, `provider_request_failed` |
+| 502 | `provider_request_rejected` (for example an unknown `AI_MODEL`), `provider_response_invalid`, `provider_request_failed`, `invalid_model_output`, `model_turn_limit` |
+| 504 | `model_timeout` |
+
+## Model-driven investigations
+
+With `ORCHESTRATOR=model`, a model chooses which read-only tools to call and writes the analysis,
+within fixed bounds: at most 8 tool calls, 6 model turns, and 60 seconds per investigation. Tool
+output is sent to the model as delimited, untrusted data. The model cites evidence by source ID
+only: the service supplies the evidence list, timeline, and source statuses itself, so the model
+cannot invent or alter evidence. An answer that fails validation gets one repair attempt; a second
+failure returns HTTP 502 `invalid_model_output`.
+
+With the default `AI_PROVIDER=mock`, an offline rule-based stand-in plays the model, so the whole
+path runs without a network:
+
+```bash
+ORCHESTRATOR=model uv run uvicorn cloud_incident_service.main:app
+```
+
+`AI_PROVIDER=bedrock` with `AI_MODEL` and `AWS_REGION` uses Amazon Bedrock instead; live use is
+covered in F-10.
 
 ## Investigation traces
 
@@ -115,8 +137,8 @@ uv run python -m cloud_incident_service.evaluation
 Every scenario is scored on five checks: `schema`, `citations` (every cited source was returned by
 a tool, required sources are cited, untrusted sources are never used as support or
 recommendations), `hypothesis`, `sources`, and `safety` (no unregistered tool requests, every
-remediation requires approval). Add `--json` for the full report, or `--min-pass-rate 0.8` to change
-the exit threshold (default 1.0). The deterministic orchestrator must pass every scenario, and CI
+remediation requires approval). Add `--json` for the full report, `--orchestrator model` to score the model-driven path, or
+`--min-pass-rate 0.8` to change the exit threshold (default 1.0). The deterministic orchestrator must pass every scenario, and CI
 runs the evaluation.
 
 ## Requirements and Codex workflow

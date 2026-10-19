@@ -31,6 +31,17 @@ class ToolCallObserver(Protocol):
 
     def record_tool_refused(self, tool: str, reason: str, argument_names: list[str]) -> None: ...
 
+    def record_model_turn(
+        self,
+        stop_reason: str,
+        tool_calls: list[str],
+        input_tokens: int,
+        output_tokens: int,
+        latency_ms: float,
+    ) -> None: ...
+
+    def record_validation(self, check: str, error: Exception | None = None) -> None: ...
+
 
 class ToolRegistry:
     """Holds read-only tools only (SEC-1). Registration of anything else fails."""
@@ -80,16 +91,27 @@ class ToolSession:
     def tool_names(self) -> list[str]:
         return list(self._tools)
 
+    def specs(self) -> list[dict[str, Any]]:
+        """Name, description, and JSON input schema of each tool, for model tool use."""
+        return [
+            {
+                "name": tool.name,
+                "description": getattr(tool, "description", tool.name),
+                "input_schema": tool.input_model.model_json_schema(),
+            }
+            for tool in self._tools.values()
+        ]
+
     async def invoke(self, name: str, arguments: Mapping[str, object]) -> ToolResult:
         tool = self._tools.get(name)
         if tool is None:
             logger.warning("Refused unregistered tool: %s", name[:64])
-            self._refused(name, "not_registered", arguments)
+            self.record_refusal(name, "not_registered", arguments)
             raise ToolNotRegisteredError(f"tool {name[:64]!r} is not registered")
         try:
             query = tool.input_model.model_validate(arguments)
         except ValidationError as exc:
-            self._refused(name, "invalid_arguments", arguments)
+            self.record_refusal(name, "invalid_arguments", arguments)
             raise ToolInputError(
                 f"invalid arguments for tool {name!r}: {exc.error_count()} error(s)"
             ) from None
@@ -111,9 +133,26 @@ class ToolSession:
             self._observer.record_tool_call(query.model_dump(mode="json"), result, duration_ms)
         return result
 
-    def _refused(self, name: str, reason: str, arguments: Mapping[str, object]) -> None:
+    def record_refusal(self, name: str, reason: str, arguments: Mapping[str, object]) -> None:
         if self._observer is not None:
             self._observer.record_tool_refused(name, reason, [str(key) for key in arguments])
+
+    def record_model_turn(
+        self,
+        stop_reason: str,
+        tool_calls: list[str],
+        input_tokens: int,
+        output_tokens: int,
+        latency_ms: float,
+    ) -> None:
+        if self._observer is not None:
+            self._observer.record_model_turn(
+                stop_reason, tool_calls, input_tokens, output_tokens, latency_ms
+            )
+
+    def record_validation(self, check: str, error: Exception | None = None) -> None:
+        if self._observer is not None:
+            self._observer.record_validation(check, error)
 
     async def _run(self, tool: Tool, query: object) -> ToolResult:
         try:

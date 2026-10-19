@@ -40,6 +40,7 @@ class Tool(Protocol):
     """A read-only evidence source. `run` returns raw output that the registry validates."""
 
     name: str
+    description: str
     read_only: Literal[True]
     input_model: type[BaseModel]
     output_model: type[ToolOutput]

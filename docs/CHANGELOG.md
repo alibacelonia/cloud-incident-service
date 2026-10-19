@@ -21,3 +21,6 @@ All notable project changes are recorded here.
 - Redact secrets in tool output and reported symptoms before they reach reports or traces.
 - Add the evaluation harness: ten synthetic scenarios scored on schema, citations, hypothesis, sources, and safety; `python -m cloud_incident_service.evaluation` runs them and CI requires a 100% pass rate.
 - Flag evidence that resembles injected instructions and never recommend it; add a prompt-injection log line to the `notify-api` fixtures.
+- Add the model-driven orchestrator (`ORCHESTRATOR=model`): a bounded tool-use loop (8 tool calls, 6 turns, 60 seconds) over the read-only registry, with validated JSON answers, one repair attempt, and traced model turns. The model cites evidence by source ID only.
+- Replace the text-only provider with a tool-use `ModelClient`; the Bedrock adapter now uses Converse tool use with timeouts. An offline rule-based client runs the model path with `AI_PROVIDER=mock`.
+- Fix: token counts in traces were redacted as secrets, and a trace export error could fail an investigation.

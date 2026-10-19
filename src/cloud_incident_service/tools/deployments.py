@@ -62,6 +62,10 @@ class DeploymentHistoryTool(FixtureTool):
     """Deployments that started within the window or the preceding look-back period."""
 
     name = TOOL_NAME
+    description = (
+        "Deployments of a service and environment that started within the incident window"
+        " or the 60 minutes before it."
+    )
     output_model = DeploymentHistory
     collections = {"deployments": "started_at"}
     lookback = CHANGE_LOOKBACK

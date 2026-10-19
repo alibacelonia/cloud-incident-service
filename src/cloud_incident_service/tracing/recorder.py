@@ -11,6 +11,7 @@ from cloud_incident_service.domain import IncidentRequest, Provenance, ToolResul
 from cloud_incident_service.redaction import redact, redact_text
 from cloud_incident_service.tracing.models import (
     InvestigationTrace,
+    ModelTurnStep,
     ToolCallStep,
     ToolRefusedStep,
     ValidationOutcome,
@@ -58,6 +59,24 @@ class TraceRecorder:
                 tool=tool[:64],
                 reason=reason,
                 argument_names=[name[:64] for name in argument_names[:20]],
+            )
+        )
+
+    def record_model_turn(
+        self,
+        stop_reason: str,
+        tool_calls: list[str],
+        input_tokens: int,
+        output_tokens: int,
+        latency_ms: float,
+    ) -> None:
+        self.trace.steps.append(
+            ModelTurnStep(
+                stop_reason=stop_reason,
+                tool_calls=[name[:64] for name in tool_calls[:20]],
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                latency_ms=round(latency_ms, 3),
             )
         )
 

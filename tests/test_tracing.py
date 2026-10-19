@@ -105,12 +105,19 @@ def test_redaction_leaves_ordinary_values(text: str) -> None:
 
 
 def test_redaction_walks_nested_structures_and_sensitive_keys() -> None:
-    value = {"outer": [{"note": f"by {CANARY_EMAIL}"}], "api_key": "x", "password": "", "n": 3}
+    value = {
+        "outer": [{"note": f"by {CANARY_EMAIL}"}],
+        "api_key": "x",
+        "password": "",
+        "input_tokens": 120,
+        "n": 3,
+    }
 
     assert redact(value) == {
         "outer": [{"note": "by [REDACTED:email]"}],
         "api_key": "[REDACTED:secret]",
         "password": "",
+        "input_tokens": 120,
         "n": 3,
     }
 
@@ -316,17 +323,24 @@ def test_file_sink_writes_one_valid_json_file_atomically(tmp_path: Path) -> None
 
 
 class BrokenSink:
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+
     def write(self, trace: InvestigationTrace) -> None:
-        raise PermissionError("disk is read-only")
+        raise self.error
 
 
-def test_trace_export_failure_does_not_fail_the_investigation(caplog) -> None:
+@pytest.mark.parametrize(
+    "error", [PermissionError("disk is read-only"), ValueError("bad trace content")]
+)
+def test_trace_export_failure_does_not_fail_the_investigation(caplog, error) -> None:
     with caplog.at_level(logging.ERROR):
-        report = run(traced_service(sink=BrokenSink()))
+        report = run(traced_service(sink=BrokenSink(error)))
 
     assert report.status == "complete"
-    assert f"Trace export failed: investigation_id={FIXED_ID} error=PermissionError" in caplog.text
-    assert "read-only" not in caplog.text
+    expected = f"Trace export failed: investigation_id={FIXED_ID} error={type(error).__name__}"
+    assert expected in caplog.text
+    assert str(error) not in caplog.text
 
 
 def test_traces_are_disabled_unless_trace_dir_is_set(monkeypatch, tmp_path: Path) -> None:

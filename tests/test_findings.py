@@ -6,7 +6,7 @@ import pytest
 from cloud_incident_service.application import InvestigationService
 from cloud_incident_service.domain import Evidence, IncidentReport, IncidentRequest, ToolResult
 from cloud_incident_service.orchestration import DeterministicOrchestrator
-from cloud_incident_service.orchestration.findings import build_findings
+from cloud_incident_service.orchestration.findings import build_findings, merge_results
 from cloud_incident_service.tools import build_default_registry
 
 SCENARIOS = {
@@ -309,3 +309,35 @@ def test_all_sources_failing_returns_partial_report_without_findings() -> None:
         "cloudwatch_signals",
         "deployment_history",
     ]
+
+
+def test_merge_results_keeps_best_status_earliest_date_and_unique_evidence() -> None:
+    early = datetime(2026, 10, 19, 10, 30, tzinfo=UTC)
+    results = [
+        ToolResult(tool="cloudwatch_signals", status="unavailable", error="timed out"),
+        ToolResult(
+            tool="deployment_history",
+            status="ok",
+            data_as_of=AS_OF,
+            evidence=deployment_result().evidence,
+        ),
+        ToolResult(
+            tool="cloudwatch_signals", status="ok", data_as_of=early, evidence=SIGNALS.evidence
+        ),
+        ToolResult(tool="cloudwatch_signals", status="empty", data_as_of=AS_OF),
+        ToolResult(
+            tool="deployment_history",
+            status="ok",
+            data_as_of=AS_OF,
+            evidence=deployment_result().evidence,
+        ),
+    ]
+
+    merged = merge_results(results)
+
+    assert [(item.tool, item.status) for item in merged] == [
+        ("cloudwatch_signals", "ok"),
+        ("deployment_history", "ok"),
+    ]
+    assert merged[0].data_as_of == early
+    assert len(merged[1].evidence) == 1

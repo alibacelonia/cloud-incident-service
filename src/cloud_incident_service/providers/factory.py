@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 from cloud_incident_service.config import Settings
-from cloud_incident_service.providers.base import AIProvider, ProviderConfigurationError
-from cloud_incident_service.providers.mock import MockProvider
+from cloud_incident_service.providers.base import ProviderConfigurationError
+from cloud_incident_service.providers.model_client import ModelClient
 
 
-def create_provider(settings: Settings | None = None) -> AIProvider:
+def create_model_client(settings: Settings | None = None) -> ModelClient | None:
+    """The configured live model client, or None for AI_PROVIDER=mock (no network)."""
     selected = settings or Settings.from_environment()
     if selected.provider == "mock":
-        return MockProvider()
+        return None
     if selected.provider == "bedrock":
-        from cloud_incident_service.providers.bedrock import BedrockProvider
+        from cloud_incident_service.providers.bedrock import BedrockModelClient
 
-        return BedrockProvider(selected.model, selected.aws_region)
+        return BedrockModelClient(selected.model, selected.aws_region)
     raise ProviderConfigurationError(f"AI_PROVIDER: unsupported provider {selected.provider!r}")

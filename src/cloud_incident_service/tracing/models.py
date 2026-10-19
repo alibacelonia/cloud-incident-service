@@ -28,18 +28,31 @@ class ToolRefusedStep(BaseModel):
 
     type: Literal["tool_refused"] = "tool_refused"
     tool: Annotated[str, Field(max_length=64)]
-    reason: Literal["not_registered", "invalid_arguments"]
+    reason: Literal["not_registered", "invalid_arguments", "limit_reached"]
     # Only argument names are kept: refused arguments may come from a model and are untrusted.
     argument_names: list[str] = Field(default_factory=list)
 
 
-TraceStep = Annotated[ToolCallStep | ToolRefusedStep, Field(discriminator="type")]
+class ModelTurnStep(BaseModel):
+    """One model call: why it stopped, which tools it requested, and its cost (FR-7)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["model_turn"] = "model_turn"
+    stop_reason: str
+    tool_calls: list[str] = Field(default_factory=list)
+    input_tokens: int = Field(ge=0)
+    output_tokens: int = Field(ge=0)
+    latency_ms: float = Field(ge=0)
+
+
+TraceStep = Annotated[ToolCallStep | ToolRefusedStep | ModelTurnStep, Field(discriminator="type")]
 
 
 class ValidationOutcome(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    check: Literal["report_schema", "evidence_provenance"]
+    check: Literal["model_output", "report_schema", "evidence_provenance"]
     passed: bool
     detail: str | None = None
 

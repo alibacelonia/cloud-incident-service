@@ -13,6 +13,8 @@ ENVIRONMENT_VARIABLES: dict[str, str] = {
     "model": "AI_MODEL",
     "aws_region": "AWS_REGION",
     "trace_dir": "TRACE_DIR",
+    "orchestrator": "ORCHESTRATOR",
+    "model_max_output_tokens": "MODEL_MAX_OUTPUT_TOKENS",
 }
 
 
@@ -32,6 +34,9 @@ class Settings(BaseModel):
     aws_region: str | None = Field(default=None, pattern=r"^[a-z]{2}(-[a-z]+)+-\d+$")
     # D-3: traces are written only when a directory is configured.
     trace_dir: Path | None = None
+    orchestrator: Literal["deterministic", "model"] = "deterministic"
+    # A-7: output-token cap for each model turn.
+    model_max_output_tokens: int = Field(default=2_048, ge=256, le=8_192)
 
     @field_validator("trace_dir", mode="before")
     @classmethod
@@ -53,9 +58,17 @@ class Settings(BaseModel):
         provider = env.get("AI_PROVIDER", "mock").strip().lower()
         model = env.get("AI_MODEL", "").strip()
         region = (env.get("AWS_REGION") or env.get("AWS_DEFAULT_REGION") or "").strip() or None
-        trace_dir = env.get("TRACE_DIR", "").strip() or None
+        optional = {
+            field: value
+            for field, value in (
+                ("trace_dir", env.get("TRACE_DIR", "").strip()),
+                ("orchestrator", env.get("ORCHESTRATOR", "").strip().lower()),
+                ("model_max_output_tokens", env.get("MODEL_MAX_OUTPUT_TOKENS", "").strip()),
+            )
+            if value
+        }
         try:
-            return cls(provider=provider, model=model, aws_region=region, trace_dir=trace_dir)
+            return cls(provider=provider, model=model, aws_region=region, **optional)
         except ValidationError as exc:
             errors = _safe_messages(exc)
             # Field errors stop the model validator from running; report missing values too.

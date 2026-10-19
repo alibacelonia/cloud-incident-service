@@ -173,7 +173,7 @@ def test_cli_fails_below_minimum_pass_rate(monkeypatch, capsys) -> None:
         ],
     )
 
-    async def fake_run():
+    async def fake_run(**_kwargs):
         return failing
 
     monkeypatch.setattr(cli, "run_evaluation", fake_run)

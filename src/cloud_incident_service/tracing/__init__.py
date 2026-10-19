@@ -1,5 +1,6 @@
 from cloud_incident_service.tracing.models import (
     InvestigationTrace,
+    ModelTurnStep,
     ToolCallStep,
     ToolRefusedStep,
     ValidationOutcome,
@@ -16,6 +17,7 @@ __all__ = [
     "FileTraceSink",
     "InMemoryTraceSink",
     "InvestigationTrace",
+    "ModelTurnStep",
     "ToolCallStep",
     "ToolRefusedStep",
     "TraceRecorder",

@@ -38,19 +38,17 @@ def redact(value: Any) -> Any:
     if isinstance(value, str):
         return redact_text(value)
     if isinstance(value, dict):
+        # Only string values under secret-looking keys are replaced; counts such as
+        # `input_tokens` stay intact.
         return {
             redact_text(str(key)): "[REDACTED:secret]"
-            if _SENSITIVE_KEY.search(str(key)) and value_is_set(item)
+            if _SENSITIVE_KEY.search(str(key)) and isinstance(item, str) and item
             else redact(item)
             for key, item in value.items()
         }
     if isinstance(value, list | tuple):
         return [redact(item) for item in value]
     return value
-
-
-def value_is_set(value: Any) -> bool:
-    return value not in (None, "", [], {})
 
 
 def redact_evidence(item: Evidence) -> Evidence:

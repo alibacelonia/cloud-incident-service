@@ -10,7 +10,10 @@ Remediation is proposed only for medium or high hypotheses and always requires h
 
 from __future__ import annotations
 
+from collections.abc import Set
+from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import Literal
 
 from cloud_incident_service.correlation import (
     CORRELATION_WINDOW,
@@ -43,41 +46,105 @@ SUMMARY_LIMIT = 1_000
 _CONFIDENCE_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 
-def build_findings(request: IncidentRequest, results: list[ToolResult]) -> Findings:
+@dataclass(frozen=True)
+class SourceSummary:
+    """What the tool results say on their own, independent of how findings are produced."""
+
+    evidence: list[Evidence]
+    events: list[Evidence]
+    status: Literal["complete", "partial"]
+    failed: frozenset[str]
+    stale: frozenset[str]
+    data_sources: list[DataSource]
+    source_uncertainties: list[Uncertainty]
+    instruction_uncertainties: list[Uncertainty]
+
+    @property
+    def timeline(self) -> list[str]:
+        # The timeline holds events only; runbook sections are reference material.
+        return [item.source_id for item in self.events]
+
+
+_STATUS_PRIORITY = {"ok": 0, "empty": 1, "malformed": 2, "unavailable": 3}
+
+
+def merge_results(results: list[ToolResult]) -> list[ToolResult]:
+    """One result per tool, in first-call order, for tools called more than once.
+
+    Evidence is de-duplicated by source ID, the best status wins (ok, empty, malformed,
+    unavailable), and the earliest `data_as_of` is kept so staleness is not hidden.
+    """
+    grouped: dict[str, list[ToolResult]] = {}
+    for result in results:
+        grouped.setdefault(result.tool, []).append(result)
+    merged = []
+    for tool, group in grouped.items():
+        if len(group) == 1:
+            merged.append(group[0])
+            continue
+        best = min(group, key=lambda result: _STATUS_PRIORITY[result.status])
+        evidence = {item.source_id: item for result in group for item in result.evidence}
+        dates = [result.data_as_of for result in group if result.data_as_of is not None]
+        merged.append(
+            ToolResult(
+                tool=tool,
+                status=best.status,
+                data_as_of=min(dates) if dates else None,
+                evidence=list(evidence.values()),
+                error=best.error,
+            )
+        )
+    return merged
+
+
+def summarize_sources(request: IncidentRequest, results: list[ToolResult]) -> SourceSummary:
+    results = merge_results(results)
     evidence = sorted(
         (item for result in results for item in result.evidence),
         key=lambda item: (item.timestamp, item.source_id),
     )
-    events = [item for item in evidence if item.kind != RUNBOOK_SECTION]
-    failed = {result.tool for result in results if result.status in FAILED_STATUSES}
-    stale = stale_tools(results, request.time_range.end)
-    change_sources_missing = any(tool in failed for tool in CHANGE_TOOLS)
-
-    onset = signal_onset(events)
-    changes = correlated_changes(events, onset) if onset else []
-    contradictions = find_contradictions(events)
-    analysis = _Analysis(request, events, onset, changes, contradictions, change_sources_missing)
-
-    partial = not results or bool(failed)
-    return Findings(
-        status="partial" if partial else "complete",
-        summary=_summary(request, evidence, analysis, partial and bool(results), bool(stale)),
+    failed = frozenset(result.tool for result in results if result.status in FAILED_STATUSES)
+    stale = frozenset(stale_tools(results, request.time_range.end))
+    return SourceSummary(
         evidence=evidence,
-        # The timeline holds events only; runbook sections are reference material.
-        timeline=[item.source_id for item in events],
-        facts=analysis.facts(),
-        hypotheses=analysis.hypotheses,
-        uncertainties=[
-            *_source_uncertainties(results, stale),
-            *analysis.uncertainties(),
-            *_instruction_uncertainties(evidence),
-        ],
-        next_steps=[*analysis.next_steps(), *_runbook_step(evidence, onset)],
-        remediation_proposals=analysis.remediation,
+        events=[item for item in evidence if item.kind != RUNBOOK_SECTION],
+        status="partial" if not results or failed else "complete",
+        failed=failed,
+        stale=stale,
         data_sources=[
             DataSource(tool=result.tool, status="stale" if result.tool in stale else result.status)
             for result in results
         ],
+        source_uncertainties=_source_uncertainties(results, stale),
+        instruction_uncertainties=_instruction_uncertainties(evidence),
+    )
+
+
+def build_findings(request: IncidentRequest, results: list[ToolResult]) -> Findings:
+    sources = summarize_sources(request, results)
+    change_sources_missing = any(tool in sources.failed for tool in CHANGE_TOOLS)
+    onset = signal_onset(sources.events)
+    changes = correlated_changes(sources.events, onset) if onset else []
+    contradictions = find_contradictions(sources.events)
+    analysis = _Analysis(
+        request, sources.events, onset, changes, contradictions, change_sources_missing
+    )
+    incomplete = sources.status == "partial" and bool(results)
+    return Findings(
+        status=sources.status,
+        summary=_summary(request, sources.evidence, analysis, incomplete, bool(sources.stale)),
+        evidence=sources.evidence,
+        timeline=sources.timeline,
+        facts=analysis.facts(),
+        hypotheses=analysis.hypotheses,
+        uncertainties=[
+            *sources.source_uncertainties,
+            *analysis.uncertainties(),
+            *sources.instruction_uncertainties,
+        ],
+        next_steps=[*analysis.next_steps(), *_runbook_step(sources.evidence, onset)],
+        remediation_proposals=analysis.remediation,
+        data_sources=sources.data_sources,
     )
 
 
@@ -320,7 +387,7 @@ class _Analysis:
         return steps
 
 
-def _source_uncertainties(results: list[ToolResult], stale: set[str]) -> list[Uncertainty]:
+def _source_uncertainties(results: list[ToolResult], stale: Set[str]) -> list[Uncertainty]:
     if not results:
         return [
             Uncertainty(description="No evidence sources are registered, so none were queried.")

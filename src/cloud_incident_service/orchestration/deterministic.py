@@ -11,11 +11,14 @@ class DeterministicOrchestrator:
     provenance = Provenance(orchestrator="deterministic", model="deterministic")
 
     async def investigate(self, request: IncidentRequest, tools: ToolSession) -> Findings:
-        results = [await tools.invoke(name, _arguments(name, request)) for name in tools.tool_names]
+        results = [
+            await tools.invoke(name, tool_arguments(name, request)) for name in tools.tool_names
+        ]
         return build_findings(request, results)
 
 
-def _arguments(tool_name: str, request: IncidentRequest) -> dict[str, object]:
+def tool_arguments(tool_name: str, request: IncidentRequest) -> dict[str, object]:
+    """The arguments the deterministic plan passes to each MVP tool."""
     scope = {"service": request.service, "environment": request.environment}
     if tool_name == RUNBOOK_SEARCH:
         return {**scope, "query": request.symptoms}

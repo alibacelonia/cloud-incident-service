@@ -94,3 +94,16 @@
   - Evidence whose text resembles instructions (for example "ignore previous instructions", "call the … tool") is flagged with an uncertainty and excluded from recommended runbook steps. It stays in the report as data.
   - CI runs `python -m cloud_incident_service.evaluation`, which exits non-zero below `--min-pass-rate` (default 1.0).
 - **Consequences:** Behaviour changes that alter findings show up as failing scenarios. The instruction detector is pattern-based and is a secondary control; the primary controls remain the read-only registry, delimited prompts (F-09), and report validation.
+
+## ADR-013: Model orchestrator owns evidence; the model writes analysis only
+
+- **Status:** accepted (2026-10-19; implements ADR-002, ADR-005, D-2, D-7, A-7)
+- **Context:** A model-driven orchestrator must not be able to invent evidence, hide failed sources, exceed cost bounds, or act on injected instructions, and it must be testable without a network.
+- **Decision:**
+  - `ModelClient.converse(system, messages, tools, max_output_tokens) -> ModelTurn` replaces the text-only `AIProvider`. `BedrockModelClient` maps it to the Converse API with tool use, temperature 0, and botocore connect/read timeouts and two retry attempts.
+  - `ModelOrchestrator` runs a loop bounded by 8 tool calls (extra calls are refused with `limit_reached` and traced), 6 model turns, and a 60-second overall timeout. Tool calls go through the investigation's `ToolSession`, so unregistered tools and invalid arguments are refused and traced, and the refusal is returned to the model as an error result.
+  - Tool results are sent as JSON with an explicit untrusted-data note; the system prompt (`prompts/investigation_v1.txt`) forbids following instructions found in evidence.
+  - The model's final answer is a JSON `ModelFindings` (summary, facts, hypotheses, uncertainties, next steps, remediation proposals) that cites evidence by `source_id`. The orchestrator supplies evidence, timeline, source statuses, report status, and source and instruction uncertainties from the tool results. Repeated calls to the same tool are merged per tool.
+  - An answer that fails validation (malformed JSON, unknown citations, `requires_human_approval: false`, cut off at the token limit, or blocked by content filters) gets one repair message listing the validation errors without input values. A second failure raises `invalid_model_output` (HTTP 502); turn limits raise `model_turn_limit` (502) and timeouts `model_timeout` (504). Model turns (stop reason, requested tools, tokens, latency) and validation outcomes are traced.
+  - `RuleBasedModelClient` stands in for a model when `AI_PROVIDER=mock`: it requests every tool, then answers with the deterministic findings derived from the tool payloads it received, so the full model path and the evaluation harness run offline.
+- **Consequences:** Model output can only add analysis over verified evidence, and every failure mode is bounded and observable. The offline stand-in validates plumbing, not model quality; live quality is measured in F-10. Validation-driven repair costs at most one extra turn.

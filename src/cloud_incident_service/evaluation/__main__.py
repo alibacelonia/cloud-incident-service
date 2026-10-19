@@ -6,8 +6,10 @@ import argparse
 import asyncio
 import sys
 
+from cloud_incident_service.config import ConfigurationError, Settings
 from cloud_incident_service.evaluation.models import EvaluationReport
 from cloud_incident_service.evaluation.runner import run_evaluation
+from cloud_incident_service.orchestration import build_orchestrator
 
 
 def format_table(report: EvaluationReport) -> str:
@@ -32,11 +34,24 @@ def main(argv: list[str] | None = None) -> int:
         default=1.0,
         help="exit with status 1 when the pass rate is below this value (default 1.0)",
     )
+    parser.add_argument(
+        "--orchestrator",
+        choices=["deterministic", "model"],
+        help="orchestrator to evaluate (default: the ORCHESTRATOR setting)",
+    )
     args = parser.parse_args(argv)
     if not 0.0 <= args.min_pass_rate <= 1.0:
         parser.error("--min-pass-rate must be between 0 and 1")
+    try:
+        settings = Settings.from_environment()
+        if args.orchestrator:
+            settings = settings.model_copy(update={"orchestrator": args.orchestrator})
+        build_orchestrator(settings)
+    except ConfigurationError as exc:
+        print(exc, file=sys.stderr)
+        return 2
 
-    report = asyncio.run(run_evaluation())
+    report = asyncio.run(run_evaluation(orchestrator_factory=lambda: build_orchestrator(settings)))
     print(report.model_dump_json(indent=2) if args.json else format_table(report))
     return 0 if report.pass_rate >= args.min_pass_rate else 1
 

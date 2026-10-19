@@ -93,14 +93,13 @@ class InvestigationService:
     def _export(self, recorder: TraceRecorder) -> None:
         if self._trace_sink is None:
             return
-        trace = recorder.export()
         try:
-            self._trace_sink.write(trace)
-        except OSError as exc:
+            self._trace_sink.write(recorder.export())
+        except Exception as exc:
             # A failed export must not fail the investigation; log the cause, not the content.
             logger.error(
                 "Trace export failed: investigation_id=%s error=%s",
-                trace.investigation_id,
+                recorder.trace.investigation_id,
                 type(exc).__name__,
             )
 

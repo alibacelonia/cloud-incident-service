@@ -42,18 +42,24 @@
   file export (D-3); it is validated at startup and by `/health` (NFR-8).
 - `redaction.py` redacts secrets in tool output (inside `ToolSession`), in reported symptoms (in
   `InvestigationService`), and in exported traces (ADR-011).
-- `providers/` defines the provider protocol (`AIProvider.generate(prompt) -> str`), an offline mock,
-  and the Bedrock adapter in `providers/bedrock.py`, which translates SDK failures into
-  `ProviderInvocationError`.
-- `prompts/` stores prompt text outside Python code.
+- `providers/` defines the provider-neutral `ModelClient` protocol and conversation types
+  (`model_client.py`) and `BedrockModelClient` (`bedrock.py`), which maps them to the Converse API
+  with tool use, runs boto3 off the event loop with connect/read timeouts, and translates SDK
+  failures into `ProviderInvocationError`. `create_model_client` returns `None` for
+  `AI_PROVIDER=mock`.
+- `prompts/` stores versioned prompt templates; `investigation_v1.txt` is the model orchestrator's
+  system prompt, and its version is recorded in report provenance and traces.
+- `orchestration/model.py` is the bounded `ModelOrchestrator` (ADR-013);
+  `orchestration/simulated.py` is `RuleBasedModelClient`, an offline stand-in used when
+  `ORCHESTRATOR=model` and `AI_PROVIDER=mock`; `orchestration/factory.py` builds the configured
+  orchestrator.
 
 - `evaluation/` runs the scenarios in `fixtures/evaluation_scenarios.json` through the real
   `InvestigationService` and scores each report and trace on five checks: schema, citations,
   hypothesis, sources, and safety (ADR-012). `python -m cloud_incident_service.evaluation` prints the
   results and exits non-zero below `--min-pass-rate`.
 
-Known gaps against the target: the model-driven orchestrator (F-09). The provider protocol supports
-text only, not tool use.
+Known gaps against the target: live Bedrock tests and live evaluation (F-10).
 
 ## Target MVP architecture
 
@@ -118,9 +124,9 @@ tests/
   `unavailable` and invalid output to `malformed`, and records results and returned evidence.
 - `Orchestrator`: `provenance` plus `async investigate(request, tools: ToolSession) -> Findings`.
   `InvestigationService` turns findings into an `IncidentReport`.
-- `ModelClient`: `async converse(system, messages, tools, limits) -> ModelTurn`, where `ModelTurn`
-  is either text or tool-use requests plus token usage. The starter endpoints were removed in F-03 (D-4); `AIProvider`
-  now serves only startup and `/health` checks until `ModelClient` replaces it in F-09.
+- `ModelClient`: `model_id` plus `async converse(system, messages, tools, max_output_tokens) ->
+  ModelTurn`, where `ModelTurn` holds text and tool-use blocks, a normalized stop reason, and token
+  usage. It replaced the text-only `AIProvider` in F-09.
 - `RunbookRetriever`: `data_as_of` plus `search(service, query, limit) -> list[RankedSection]`.
 - `TraceSink`: `write(trace)`, with a file-based implementation and an in-memory one for tests.
 

@@ -1,13 +1,6 @@
 from __future__ import annotations
 
-from typing import Protocol
-
 from cloud_incident_service.config import ConfigurationError
-
-
-class AIProvider(Protocol):
-    async def generate(self, prompt: str) -> str:
-        """Generate text for an already-rendered prompt."""
 
 
 class ProviderConfigurationError(ConfigurationError):

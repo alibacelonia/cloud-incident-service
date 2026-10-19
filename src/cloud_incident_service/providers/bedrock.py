@@ -14,10 +14,19 @@ from botocore.exceptions import (
     PartialCredentialsError,
     TokenRetrievalError,
 )
+from pydantic import ValidationError
 
 from cloud_incident_service.providers.base import (
     ProviderConfigurationError,
     ProviderInvocationError,
+)
+from cloud_incident_service.providers.model_client import (
+    Message,
+    ModelTurn,
+    TextBlock,
+    TokenUsage,
+    ToolSpec,
+    ToolUseBlock,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,7 +76,22 @@ _CLIENT_ERROR_CATEGORIES: dict[str, tuple[str, str, bool]] = {
 }
 
 
-class BedrockProvider:
+# Network bounds for a single call; the orchestrator also enforces an overall timeout (A-7).
+CONNECT_TIMEOUT_SECONDS = 5
+READ_TIMEOUT_SECONDS = 50
+_STOP_REASONS = {
+    "end_turn": "end_turn",
+    "stop_sequence": "end_turn",
+    "tool_use": "tool_use",
+    "max_tokens": "max_tokens",
+    "guardrail_intervened": "refused",
+    "content_filtered": "refused",
+}
+
+
+class BedrockModelClient:
+    """Amazon Bedrock Converse adapter with tool use. boto3 calls run off the event loop."""
+
     def __init__(self, model: str, region: str | None, client: Any | None = None) -> None:
         if not model:
             raise ProviderConfigurationError("AI_MODEL is required for AI_PROVIDER=bedrock")
@@ -75,24 +99,52 @@ class BedrockProvider:
             raise ProviderConfigurationError("AWS_REGION is required for AI_PROVIDER=bedrock")
         if client is None:
             import boto3
+            from botocore.config import Config
 
+            config = Config(
+                connect_timeout=CONNECT_TIMEOUT_SECONDS,
+                read_timeout=READ_TIMEOUT_SECONDS,
+                retries={"max_attempts": 2, "mode": "standard"},
+            )
             try:
-                # A fresh session per provider avoids boto3's process-wide cached session.
-                client = boto3.session.Session(region_name=region).client("bedrock-runtime")
+                # A fresh session per client avoids boto3's process-wide cached session.
+                session = boto3.session.Session(region_name=region)
+                client = session.client("bedrock-runtime", config=config)
             except BotoCoreError:
                 raise ProviderConfigurationError(
                     "AWS client could not be configured. Check AWS_PROFILE and AWS config files."
                 ) from None
         self._client = client
-        self._model = model
+        self.model_id = model
 
-    async def generate(self, prompt: str) -> str:
+    async def converse(
+        self,
+        system: str,
+        messages: list[Message],
+        tools: list[ToolSpec],
+        max_output_tokens: int,
+    ) -> ModelTurn:
+        request: dict[str, Any] = {
+            "modelId": self.model_id,
+            "system": [{"text": system}],
+            "messages": [_to_bedrock_message(message) for message in messages],
+            "inferenceConfig": {"maxTokens": max_output_tokens, "temperature": 0},
+        }
+        if tools:
+            request["toolConfig"] = {
+                "tools": [
+                    {
+                        "toolSpec": {
+                            "name": tool.name,
+                            "description": tool.description,
+                            "inputSchema": {"json": tool.input_schema},
+                        }
+                    }
+                    for tool in tools
+                ]
+            }
         try:
-            response = await asyncio.to_thread(
-                self._client.converse,
-                modelId=self._model,
-                messages=[{"role": "user", "content": [{"text": prompt}]}],
-            )
+            response = await asyncio.to_thread(self._client.converse, **request)
         except ClientError as exc:
             raise _classify_client_error(exc) from None
         except _CREDENTIAL_ERRORS:
@@ -113,15 +165,61 @@ class BedrockProvider:
                 "The provider call failed before a response was received.",
                 unavailable=True,
             ) from None
+        return _from_bedrock_response(response)
 
-        try:
-            return response["output"]["message"]["content"][0]["text"]
-        except (KeyError, IndexError, TypeError):
-            raise _invocation_error(
-                "provider_response_invalid",
-                "The provider returned a response in an unexpected format.",
-                unavailable=False,
-            ) from None
+
+def _to_bedrock_message(message: Message) -> dict[str, Any]:
+    content: list[dict[str, Any]] = []
+    for block in message.content:
+        if isinstance(block, TextBlock):
+            content.append({"text": block.text})
+        elif isinstance(block, ToolUseBlock):
+            content.append(
+                {"toolUse": {"toolUseId": block.id, "name": block.name, "input": block.arguments}}
+            )
+        else:
+            content.append(
+                {
+                    "toolResult": {
+                        "toolUseId": block.tool_use_id,
+                        "content": [{"json": block.content}],
+                        "status": "error" if block.is_error else "success",
+                    }
+                }
+            )
+    return {"role": message.role, "content": content}
+
+
+def _from_bedrock_response(response: Any) -> ModelTurn:
+    try:
+        blocks: list[TextBlock | ToolUseBlock] = []
+        for item in response["output"]["message"]["content"]:
+            if "text" in item:
+                blocks.append(TextBlock(text=item["text"]))
+            elif "toolUse" in item:
+                tool_use = item["toolUse"]
+                blocks.append(
+                    ToolUseBlock(
+                        id=tool_use["toolUseId"],
+                        name=tool_use["name"],
+                        arguments=tool_use.get("input") or {},
+                    )
+                )
+        usage = response.get("usage", {})
+        return ModelTurn(
+            stop_reason=_STOP_REASONS.get(response.get("stopReason"), "end_turn"),
+            content=blocks,
+            usage=TokenUsage(
+                input_tokens=usage.get("inputTokens", 0),
+                output_tokens=usage.get("outputTokens", 0),
+            ),
+        )
+    except (KeyError, TypeError, AttributeError, ValidationError):
+        raise _invocation_error(
+            "provider_response_invalid",
+            "The provider returned a response in an unexpected format.",
+            unavailable=False,
+        ) from None
 
 
 def _classify_client_error(exc: ClientError) -> ProviderInvocationError:

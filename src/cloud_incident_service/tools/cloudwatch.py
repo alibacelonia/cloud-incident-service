@@ -115,5 +115,9 @@ class CloudWatchSignalsTool(FixtureTool):
     """Alarm state changes, metric datapoints, and log events within the incident window."""
 
     name = TOOL_NAME
+    description = (
+        "Alarm state changes, metric datapoints, and log events for a service and "
+        "environment within the incident window."
+    )
     output_model = CloudWatchSignals
     collections = {"alarms": "timestamp", "metrics": "timestamp", "logs": "timestamp"}

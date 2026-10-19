@@ -50,6 +50,10 @@ class InfrastructureChangesTool(FixtureTool):
     """Configuration and infrastructure changes within the window or the look-back period."""
 
     name = TOOL_NAME
+    description = (
+        "Configuration and infrastructure changes for a service and environment within "
+        "the incident window or the 60 minutes before it."
+    )
     output_model = InfrastructureChanges
     collections = {"changes": "timestamp"}
     lookback = CHANGE_LOOKBACK

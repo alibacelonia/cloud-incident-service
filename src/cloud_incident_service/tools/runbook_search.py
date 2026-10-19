@@ -66,6 +66,10 @@ class RunbookSearchTool:
     """Returns the runbook sections that best match the reported symptoms for a service."""
 
     name = TOOL_NAME
+    description = (
+        "Runbook sections that best match a free-text query, such as the reported "
+        "symptoms, for a service."
+    )
     read_only: Literal[True] = True
     input_model = RunbookSearchQuery
     output_model = RunbookSearchResult

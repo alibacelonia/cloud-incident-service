@@ -1,15 +1,29 @@
 from cloud_incident_service.providers.base import (
-    AIProvider,
     ProviderConfigurationError,
     ProviderInvocationError,
 )
-from cloud_incident_service.providers.factory import create_provider
-from cloud_incident_service.providers.mock import MockProvider
+from cloud_incident_service.providers.factory import create_model_client
+from cloud_incident_service.providers.model_client import (
+    Message,
+    ModelClient,
+    ModelTurn,
+    TextBlock,
+    TokenUsage,
+    ToolResultBlock,
+    ToolSpec,
+    ToolUseBlock,
+)
 
 __all__ = [
-    "AIProvider",
-    "MockProvider",
+    "Message",
+    "ModelClient",
+    "ModelTurn",
     "ProviderConfigurationError",
     "ProviderInvocationError",
-    "create_provider",
+    "TextBlock",
+    "TokenUsage",
+    "ToolResultBlock",
+    "ToolSpec",
+    "ToolUseBlock",
+    "create_model_client",
 ]

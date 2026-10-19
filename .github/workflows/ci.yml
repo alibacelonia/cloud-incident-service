@@ -18,4 +18,5 @@ jobs:
       - run: uv run ruff check .
       - run: uv run pytest
       - run: uv run python -m cloud_incident_service.evaluation
+      - run: uv run python -m cloud_incident_service.evaluation --orchestrator model
 
