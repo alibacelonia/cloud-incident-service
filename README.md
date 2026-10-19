@@ -155,6 +155,11 @@ uv run python -m cloud_incident_service.evaluation --orchestrator model
 The default test suite is deterministic: a guard fails any test that opens a network connection,
 and tests ignore your shell's AI and AWS settings. CI runs all five commands.
 
+CI tests Python 3.12, 3.13, and 3.14 with locked dependencies. A separate dependency audit
+runs on pushes, pull requests, and weekly; it needs network access to the advisory service.
+Dependabot proposes uv dependency and GitHub Actions updates for review. See the workflow
+files in `.github/workflows/` for the reproducible audit commands.
+
 The evaluation runs ten scenarios from `src/cloud_incident_service/fixtures/evaluation_scenarios.json`
 (the seven required cases plus multiple changes, an unavailable source, and a malformed source).
 Each is scored on `schema`, `citations` (every cited source was returned by a tool, required
@@ -181,6 +186,9 @@ AI_PROVIDER=bedrock AI_MODEL=<model-id> AWS_REGION=<region> \
 ```
 
 ## Project documents
+
+The next release is scoped in [the proposed v0.2 plan](docs/V0_2_PLAN.md). Implementation
+and live AWS/model runs require the owner's separate approvals recorded there.
 
 | Document | Contents |
 | --- | --- |

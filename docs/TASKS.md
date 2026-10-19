@@ -22,6 +22,15 @@ Each feature is a vertical slice that can be observed through the API or the tes
 
 ## Backlog
 
+| ID | Priority | Status | Planning / release task | Dependencies | Acceptance criteria |
+| --- | --- | --- | --- | --- | --- |
+| R-01 | P1 | done | Publish v0.1.0 | passing release checks | Release commit e3fc095; green Python 3.12–3.14 CI matrix and audit; annotated v0.1.0 tag and GitHub release published 2026-10-19 |
+| V2-00 | P2 | done | Draft v0.2 requirements | MVP complete | `V0_2_PLAN.md` defines tests, limits, dependencies, and owner decisions; ADR-016 proposed |
+| V2-01 | P2 | blocked | Approve live-log scope and contract | owner approval | Resolve every proposed decision in `V0_2_PLAN.md` before implementation changes |
+| V2-02 | P2 | blocked | Implement CloudWatch adapter offline | V2-01; explicit owner authorization | V2-01–V2-09 requirements pass with fake SDK clients; no live calls |
+| V2-03 | P2 | blocked | Live sandbox verification | V2-02; approved run plan | V2-10 gates and agreed caps pass; no real data committed |
+| V2-04 | P2 | blocked | Repeated Bedrock reliability study | approved budget/run plan | Five proposed runs report pass variability, latency, tokens, and cost without altering the baseline |
+
 Release maintenance (2026-10-19): Python 3.12–3.14 CI matrix, locked installation,
 scheduled dependency audit, and Dependabot configuration added for v0.1.0.
 The HTTPX/Starlette TestClient deprecation warning is tracked as M-01: evaluate the

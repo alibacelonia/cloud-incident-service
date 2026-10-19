@@ -73,4 +73,10 @@ def test_decision_records_are_numbered_without_gaps() -> None:
     numbers = [int(value) for value in re.findall(r"^## ADR-(\d{3}):", decisions, re.M)]
 
     assert numbers == list(range(1, len(numbers) + 1))
-    assert all("**Status:** accepted" in block for block in decisions.split("## ADR-")[1:])
+    blocks = decisions.split("## ADR-")[1:]
+    # Delivered MVP decisions remain accepted; future work may be proposed for owner review.
+    assert all("**Status:** accepted" in block for block in blocks[:15])
+    assert all(
+        re.search(r"\*\*Status:\*\* (accepted|proposed|rejected|superseded)\b", block)
+        for block in blocks
+    )

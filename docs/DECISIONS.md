@@ -129,3 +129,16 @@
   - Prompt `investigation_v3` states these rules, including the 30-minute window.
   - Revision after the third live run: prompt `investigation_v3` asked for next steps even when there was no evidence to cite, which the report rules forbid. `investigation_v4` requires next steps to cite evidence (none when there is no evidence), and a next step that cites nothing is moved to uncertainties as an unverified suggestion.
 - **Consequences:** The model path and the deterministic path share one definition of a hypothesis, so evaluation results measure the model's evidence gathering, reading, and writing rather than its ability to infer unstated rules. The model can no longer propose causes outside recorded changes (for example a dependency outage); those belong in uncertainties and next steps, as on the deterministic path. Loosening that would be a requirements change.
+
+## ADR-016: First live source is an opt-in, bounded CloudWatch log adapter
+
+- **Status:** proposed; owner approval required before implementation modifications.
+- **Context:** v0.1 is complete; P-02 proposes live AWS sources. A small first adapter needs
+  explicit scope, resource authorization, collection bounds, and a data policy.
+- **Proposed decision:** Implement one-account/region allowlisted log collection using only
+  `FilterLogEvents`, behind the existing tool protocol. Keep fixture defaults, require offline
+  tests, expose incomplete collection, and disable live evidence transfer to Bedrock by default.
+  See `V0_2_PLAN.md` for testable requirements, proposed limits, and unresolved decisions.
+- **Consequences:** Live logs can extend the portfolio while preserving the current boundaries.
+  Metrics, alarms, cross-account discovery, writes, and production deployment remain deferred.
+  No AWS/IAM changes or paid tests are authorized by this proposal.

@@ -11,6 +11,9 @@
 
 ## Project overview
 
+Post-MVP planning: [v0.2 proposal](V0_2_PLAN.md) scopes one real CloudWatch log reader.
+It is pending owner approval and does not change the approved MVP scope or authorize AWS access.
+
 A local-first FastAPI service that investigates an AWS-style service incident with a single,
 bounded, tool-using agent. It collects evidence from narrowly scoped read-only tools backed by
 synthetic fixtures, correlates that evidence by timestamp and service, and returns a

@@ -6,6 +6,10 @@ requirements are in `docs/PROJECT.md` and the reasoning behind each choice is in
 
 ## Technology stack
 
+The proposed next adapter is described in [V0_2_PLAN.md](V0_2_PLAN.md). It would implement
+the existing tool boundary outside the domain layer. No live adapter is implemented or
+approved by this architecture document; truncation and live-data policy need decisions first.
+
 - Python 3.12+, FastAPI, Pydantic, pytest, Ruff, and uv.
 - boto3, used only by the opt-in Amazon Bedrock adapter.
 - No database, background workers, Docker, or frontend (`project.yaml`).
