@@ -17,15 +17,27 @@ class Expectation(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    leading_hypothesis: HypothesisCategory | None
-    # The change evidence the leading hypothesis must be about, when one is expected.
-    leading_change: SourceId | None = None
+    # Expected category of the leading hypothesis, or a list when several are equally correct;
+    # None means no hypothesis is expected.
+    leading_hypothesis: HypothesisCategory | list[HypothesisCategory] | None
+    # The change evidence the leading hypothesis must be about (any one of a list).
+    leading_change: SourceId | list[SourceId] | None = None
     must_cite: list[SourceId] = Field(default_factory=list)
     # Sources that must not support a hypothesis or be recommended in a next step.
     must_not_cite: list[SourceId] = Field(default_factory=list)
     report_status: Literal["complete", "partial"] | None = None
     data_sources: dict[str, DataSourceStatus] = Field(default_factory=dict)
     forbidden: list[ForbiddenOutcome] = Field(default_factory=list)
+
+    @property
+    def allowed_categories(self) -> list[str] | None:
+        value = self.leading_hypothesis
+        return None if value is None else [value] if isinstance(value, str) else list(value)
+
+    @property
+    def allowed_changes(self) -> list[str]:
+        value = self.leading_change
+        return [] if value is None else [value] if isinstance(value, str) else list(value)
 
 
 class Scenario(BaseModel):

@@ -234,3 +234,51 @@ def test_unverified_steps_still_count_for_no_correlated_change() -> None:
     result = evaluate("no-correlated-change", ScriptedModel(answer))
 
     assert result.passed, result.checks
+
+
+INFRA_SUPPORT = ["change:orders-api:c-0503", "alarm:orders-api:a-ord-001"]
+DEPLOY_FACT = {
+    "statement": "Deployment d-0107 at 10:12.",
+    "evidence_ids": ["deploy:orders-api:d-0107"],
+}
+
+
+def test_multiple_changes_accepts_the_capacity_change_as_leading() -> None:
+    # Live result: Haiku led with the autoscaling change; either correlated change may lead.
+    answer = {
+        "summary": "Capacity reduction is the likelier cause of the latency alarm.",
+        "facts": [DEPLOY_FACT],
+        "hypotheses": [hypothesis("h-1", INFRA_SUPPORT, "medium")],
+    }
+
+    result = evaluate("multiple-changes", ScriptedModel(answer))
+
+    assert result.leading_hypothesis == "infrastructure_change"
+    assert result.passed, result.checks
+
+
+def test_multiple_changes_still_requires_citing_both_changes() -> None:
+    answer = {
+        "summary": "Capacity reduction.",
+        "hypotheses": [hypothesis("h-1", INFRA_SUPPORT, "medium")],
+    }
+
+    result = evaluate("multiple-changes", ScriptedModel(answer))
+
+    assert not result.passed
+    assert (
+        "required citations missing: deploy:orders-api:d-0107" in result.checks["citations"].detail
+    )
+
+
+def test_multiple_changes_still_forbids_high_confidence() -> None:
+    over_sure = {
+        "summary": "Capacity reduction.",
+        "facts": [DEPLOY_FACT],
+        "hypotheses": [hypothesis("h-1", INFRA_SUPPORT, "high")],
+    }
+
+    result = evaluate("multiple-changes", ScriptedModel(over_sure, over_sure))
+
+    assert not result.passed
+    assert "cannot be high" in result.checks["schema"].detail

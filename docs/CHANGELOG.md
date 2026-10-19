@@ -41,7 +41,10 @@ First release of the incident investigation service, built from the `ai-service`
 - Model answers are checked against the same correlation rules as the deterministic path
   (ADR-015); prompt `investigation_v4` states them. Repair messages list the citable source IDs,
   the first abnormal signal, and the candidate changes, and explain format errors. Facts and next
-  steps without evidence become uncertainties. Evaluation failures and traces include validation messages.
+  steps without evidence become uncertainties. Evaluation failures and traces include validation
+  messages.
+- Evaluation scenarios may accept several leading hypotheses; `multiple-changes` accepts either
+  correlated change as leading.
 
 ### Removed
 

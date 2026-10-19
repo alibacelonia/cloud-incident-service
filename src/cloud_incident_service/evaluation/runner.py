@@ -151,14 +151,15 @@ def _check_hypothesis(report: IncidentReport, expect: Expectation) -> CheckResul
     problems = []
     leading = report.hypotheses[0] if report.hypotheses else None
     category = _category(report, leading.supporting_evidence_ids) if leading else None
-    if category != expect.leading_hypothesis:
-        problems.append(f"leading hypothesis is {category}, expected {expect.leading_hypothesis}")
-    if (
-        expect.leading_change
-        and leading is not None
-        and expect.leading_change not in leading.supporting_evidence_ids
-    ):
-        problems.append(f"leading hypothesis is not about {expect.leading_change}")
+    categories = expect.allowed_categories
+    if categories is None:
+        if category is not None:
+            problems.append(f"leading hypothesis is {category}, expected None")
+    elif category not in categories:
+        problems.append(f"leading hypothesis is {category}, expected {_one_of(categories)}")
+    changes = expect.allowed_changes
+    if changes and leading is not None and not set(changes) & set(leading.supporting_evidence_ids):
+        problems.append(f"leading hypothesis is not about {_one_of(changes)}")
     if "any_hypothesis" in expect.forbidden and report.hypotheses:
         problems.append("hypotheses were produced but none are allowed")
     if "high_confidence" in expect.forbidden and any(
@@ -166,6 +167,10 @@ def _check_hypothesis(report: IncidentReport, expect: Expectation) -> CheckResul
     ):
         problems.append("a hypothesis was rated high confidence")
     return CheckResult(passed=not problems, detail="; ".join(problems) or None)
+
+
+def _one_of(values: list[str]) -> str:
+    return values[0] if len(values) == 1 else "one of " + ", ".join(values)
 
 
 def _check_sources(report: IncidentReport, expect: Expectation) -> CheckResult:

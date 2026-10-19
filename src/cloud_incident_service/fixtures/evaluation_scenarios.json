@@ -121,7 +121,7 @@
     },
     {
       "id": "multiple-changes",
-      "description": "Two changes precede the alarm; neither can be high confidence.",
+      "description": "Two changes precede the alarm; either may lead, neither can be high confidence.",
       "request": {
         "service": "orders-api",
         "environment": "production",
@@ -129,8 +129,8 @@
         "time_range": {"start": "2026-10-19T10:00:00Z", "end": "2026-10-19T11:00:00Z"}
       },
       "expect": {
-        "leading_hypothesis": "deployment",
-        "leading_change": "deploy:orders-api:d-0107",
+        "leading_hypothesis": ["deployment", "infrastructure_change"],
+        "leading_change": ["deploy:orders-api:d-0107", "change:orders-api:c-0503"],
         "must_cite": ["deploy:orders-api:d-0107", "change:orders-api:c-0503"],
         "report_status": "complete",
         "forbidden": ["high_confidence"]

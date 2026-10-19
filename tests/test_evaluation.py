@@ -213,3 +213,21 @@ def test_failed_model_answers_explain_the_last_rejection() -> None:
     detail = result.checks["schema"].detail
     assert detail.startswith("ModelInvestigationError: invalid_model_output; last rejected answer:")
     assert "references unknown evidence: z:a:b" in detail
+
+
+def test_expectations_accept_a_single_value_or_a_list() -> None:
+    from cloud_incident_service.evaluation import Expectation
+
+    single = Expectation(leading_hypothesis="deployment", leading_change="deploy:a-api:d-1")
+    either = Expectation(
+        leading_hypothesis=["deployment", "infrastructure_change"],
+        leading_change=["deploy:a-api:d-1", "change:a-api:c-1"],
+    )
+    none = Expectation(leading_hypothesis=None)
+
+    assert (single.allowed_categories, single.allowed_changes) == (
+        ["deployment"],
+        ["deploy:a-api:d-1"],
+    )
+    assert either.allowed_categories == ["deployment", "infrastructure_change"]
+    assert (none.allowed_categories, none.allowed_changes) == (None, [])

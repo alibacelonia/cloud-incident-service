@@ -94,6 +94,7 @@
   - Evidence whose text resembles instructions (for example "ignore previous instructions", "call the … tool") is flagged with an uncertainty and excluded from recommended runbook steps. It stays in the report as data.
   - CI runs `python -m cloud_incident_service.evaluation`, which exits non-zero below `--min-pass-rate` (default 1.0).
 - **Consequences:** Behaviour changes that alter findings show up as failing scenarios. The instruction detector is pattern-based and is a secondary control; the primary controls remain the read-only registry, delimited prompts (F-09), and report validation.
+- **Revision (2026-10-19, approved by the owner):** `leading_hypothesis` and `leading_change` may list several equally correct values. The `multiple-changes` scenario accepts either correlated change (`deploy:orders-api:d-0107` or `change:orders-api:c-0503`) as the leading hypothesis, because both start within the correlation window and the earlier expectation encoded the deterministic tie-break rather than ground truth. It still requires citing both changes and forbids high confidence. `contradictory-records` stays strict.
 
 ## ADR-013: Model orchestrator owns evidence; the model writes analysis only
 
