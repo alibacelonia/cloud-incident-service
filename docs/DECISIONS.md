@@ -1,0 +1,50 @@
+# Architecture decisions
+
+## ADR-001: Start from the ai-service profile
+
+- **Status:** accepted
+- **Context:** The project needs a lightweight, independently runnable foundation.
+- **Decision:** Use AI Project Factory template version 0.2.0 and enable only features recorded in `project.yaml`.
+- **Consequences:** The initial system stays small. Later architecture changes must be recorded here with their tradeoffs.
+
+## ADR-002: Single bounded agent behind an orchestration interface
+
+- **Status:** accepted (2026-10-19)
+- **Context:** The MVP must investigate incidents with a tool-using agent, stay deterministic in default tests, and avoid a multi-agent design until one agent demonstrably cannot keep clear ownership or context boundaries.
+- **Decision:** The API calls an `InvestigationService`, which depends on an `Orchestrator` protocol. Two implementations: a rule-based `DeterministicOrchestrator` (default, built first) and a `ModelOrchestrator` that runs a bounded tool-use loop (8 tool calls, 6 turns, 60 s, output-token cap) through a `ModelClient` protocol. Orchestration code never imports boto3.
+- **Consequences:** The deterministic path gives a reproducible baseline for evaluation and for comparison with model behaviour. Two implementations must produce the same `IncidentReport` contract. The deterministic report is template-based and less fluent than model output. Multi-agent orchestration is out of scope.
+
+## ADR-003: Schema-validated report with evidence citations
+
+- **Status:** accepted (2026-10-19)
+- **Context:** Responders must be able to tell confirmed facts from guesses, and every factual claim must trace to tool evidence. Model output can be malformed or unsupported.
+- **Decision:** `IncidentReport` is a Pydantic model with separate `facts`, `hypotheses`, `uncertainties`, `next_steps`, and `remediation_proposals`. Validators require each fact and hypothesis to cite at least one `source_id` returned during the same investigation, and `requires_human_approval` is `Literal[True]`. Confidence is categorical (`low`, `medium`, `high`) with a rationale (A-6). Invalid model output gets one repair attempt, then fails with 502 (D-7).
+- **Consequences:** Unsupported claims are rejected structurally, not by prompt wording alone. Citation checks need the set of evidence returned during the run, so validation happens in the application layer with that context, not as a stateless schema check only. Categorical confidence avoids false precision but cannot express fine-grained ranking.
+
+## ADR-004: Fixture-first, read-only tool registry
+
+- **Status:** accepted (2026-10-19)
+- **Context:** Default tests must need no AWS account or model, and the MVP must be unable to change cloud resources.
+- **Decision:** Tools implement a typed `Tool` protocol with `read_only: Literal[True]` and Pydantic input and output models. A `ToolRegistry` rejects non-read-only tools at registration, refuses unknown tool names, enforces timeouts, and turns exceptions or invalid output into `unavailable` or `malformed` results. MVP tools read synthetic fixtures packaged with the service. Real AWS read adapters are post-MVP and must implement the same protocol outside the domain layer.
+- **Consequences:** Behaviour is reproducible and safe to demo publicly. Fixture realism limits how far evaluation results generalise. Any future side-effecting capability needs a new ADR and a human-approval design before registration is possible.
+
+## ADR-005: Tool-use capable model client protocol
+
+- **Status:** accepted (2026-10-19)
+- **Context:** The existing `AIProvider.generate(prompt) -> str` cannot express tool specifications, tool-use requests, or token usage. The Bedrock adapter blocks the event loop by calling synchronous boto3 from an `async` method.
+- **Decision:** Add a `ModelClient` protocol (`converse(system, messages, tools, limits) -> ModelTurn`) with a scripted offline implementation for tests and a Bedrock Converse implementation that runs boto3 calls in a worker thread. Keep `AIProvider` only while the starter endpoints exist.
+- **Consequences:** Model-driven orchestration can be tested offline with scripted turns. Two provider abstractions coexist temporarily. A future direct Anthropic adapter would implement `ModelClient`.
+
+## ADR-006: Local JSON trace export with redaction
+
+- **Status:** accepted (2026-10-19)
+- **Context:** Investigations need a trace for debugging and evaluation. `project.yaml` sets `database: null` and prioritises low cost and offline development. Traces must never contain secrets.
+- **Decision:** A `TraceRecorder` captures steps in memory. A `Redactor` removes access key identifiers, 12-digit account identifiers, email addresses, and bearer tokens. A `TraceSink` writes one JSON file per investigation to a configurable, git-ignored directory. Writing is disabled unless the directory is configured. Tests use an in-memory sink or a temporary directory.
+- **Consequences:** No new infrastructure is needed. Traces are not queryable, and retention is manual. Pattern-based redaction is defence in depth; the primary control is that secrets never enter tool fixtures or prompts.
+
+## ADR-007: In-memory lexical runbook retrieval satisfies `rag` and `vector_database` for the MVP
+
+- **Status:** accepted (2026-10-19)
+- **Context:** `project.yaml` enables `rag`, `vector_database`, and `document_processing`, while the handoff excludes production vector infrastructure and the constraints favour low cost and offline work.
+- **Decision:** Runbooks are synthetic Markdown fixtures, split into sections at load time (document processing) and searched by a deterministic lexical `RunbookRetriever` behind a protocol. No embedding model or vector database is used in the MVP.
+- **Consequences:** Retrieval is deterministic and free, but has weaker recall than semantic search. A vector store can replace the retriever behind the same protocol later. The owner confirmed this interpretation of `vector_database: true` (D-1).
