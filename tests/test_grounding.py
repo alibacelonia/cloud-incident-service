@@ -201,3 +201,36 @@ def test_quiet_answers_pass_scenarios_without_correlated_changes(
     result = evaluate(scenario_id, model)
 
     assert result.passed, result.checks
+
+
+def test_no_data_answer_with_ungrounded_next_steps_passes() -> None:
+    # Live failure: with no evidence at all, the model suggested next steps it could not cite.
+    answer = {
+        "summary": "No source returned data for search-api.",
+        "uncertainties": [{"description": "No data from any source.", "evidence_ids": []}],
+        "next_steps": [
+            {"action": "Confirm that search-api publishes metrics.", "rationale": "No data."}
+        ],
+    }
+
+    result = evaluate("no-data", ScriptedModel(answer))
+
+    assert result.passed, result.checks
+
+
+def test_unverified_steps_still_count_for_no_correlated_change() -> None:
+    answer = QUIET | {
+        "facts": [{"statement": "Latency alarm.", "evidence_ids": ["alarm:cart-api:a-cart-001"]}],
+        "next_steps": [
+            {"action": "Check pricing-service health.", "rationale": "Upstream 503s."},
+            {
+                "action": "Review the latency alarm.",
+                "rationale": "First signal.",
+                "evidence_ids": ["alarm:cart-api:a-cart-001"],
+            },
+        ],
+    }
+
+    result = evaluate("no-correlated-change", ScriptedModel(answer))
+
+    assert result.passed, result.checks

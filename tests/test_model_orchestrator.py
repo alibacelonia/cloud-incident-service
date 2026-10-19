@@ -150,7 +150,7 @@ def test_model_driven_investigation_produces_validated_report() -> None:
     assert report.provenance.model_dump() == {
         "orchestrator": "model",
         "model": "scripted-model",
-        "prompt_version": "investigation_v3",
+        "prompt_version": "investigation_v4",
     }
     assert report.hypotheses[0].confidence == "medium"
     assert report.remediation_proposals[0].requires_human_approval is True
@@ -424,6 +424,26 @@ def test_bad_hypothesis_id_is_explained_without_regex() -> None:
     )
 
 
+def test_next_steps_without_references_become_unverified_suggestions() -> None:
+    answer_body = GOOD_ANSWER | {
+        "next_steps": [
+            *GOOD_ANSWER["next_steps"],
+            {"action": "Check the upstream pricing service.", "rationale": "It might be down."},
+        ]
+    }
+    client = ScriptedModelClient(INVESTIGATE, answer(answer_body))
+
+    report, trace = investigate(client)
+
+    assert [step.action for step in report.next_steps] == [
+        "Compare logs before and after the deployment."
+    ]
+    assert "Unverified suggestion (no evidence cited): Check the upstream pricing service." in [
+        item.description for item in report.uncertainties
+    ]
+    assert all(item.passed for item in trace.validations)
+
+
 def test_capitalized_confidence_and_risk_are_accepted() -> None:
     shouted = json.loads(json.dumps(GOOD_ANSWER))
     shouted["hypotheses"][0]["confidence"] = "Medium"
@@ -566,7 +586,7 @@ def test_api_runs_the_model_orchestrator_offline(monkeypatch) -> None:
     assert body["provenance"] == {
         "orchestrator": "model",
         "model": "rule-based-mock",
-        "prompt_version": "investigation_v3",
+        "prompt_version": "investigation_v4",
     }
     assert body["hypotheses"][0]["confidence"] == "high"
 

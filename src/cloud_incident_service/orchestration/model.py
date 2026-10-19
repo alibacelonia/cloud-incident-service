@@ -45,7 +45,7 @@ from cloud_incident_service.providers import (
 )
 from cloud_incident_service.tools import ToolInputError, ToolNotRegisteredError, ToolSession
 
-PROMPT_VERSION = "investigation_v3"
+PROMPT_VERSION = "investigation_v4"
 DEFAULT_MAX_OUTPUT_TOKENS = 2_048
 REPAIR_DETAIL_LIMIT = 1_000
 REPAIR_SOURCE_ID_LIMIT = 1_500
@@ -257,11 +257,36 @@ def extract_json(text: str) -> str:
 def normalize_answer(data: Any) -> Any:
     """Safe, claim-reducing clean-up of a model answer.
 
-    Enumerated values are lowercased, and a "fact" without evidence becomes an uncertainty,
-    because a statement without evidence is not a fact (FR-5 rule 2). Nothing is added.
+    Enumerated values are lowercased. A "fact" without evidence becomes an uncertainty, because a
+    statement without evidence is not a fact (FR-5 rule 2), and a next step that cites neither
+    evidence nor a hypothesis becomes an uncertainty marked as an unverified suggestion. Nothing
+    is added.
     """
     if not isinstance(data, dict):
         return data
+    steps = data.get("next_steps")
+    if isinstance(steps, list):
+        ungrounded = [
+            item
+            for item in steps
+            if isinstance(item, dict)
+            and not item.get("evidence_ids")
+            and not item.get("hypothesis_ids")
+        ]
+        if ungrounded:
+            data["next_steps"] = [item for item in steps if item not in ungrounded]
+            uncertainties = data.get("uncertainties")
+            data["uncertainties"] = [
+                *(uncertainties if isinstance(uncertainties, list) else []),
+                *(
+                    {
+                        "description": "Unverified suggestion (no evidence cited): "
+                        f"{item.get('action', '')}".strip(),
+                        "evidence_ids": [],
+                    }
+                    for item in ungrounded
+                ),
+            ]
     facts = data.get("facts")
     if isinstance(facts, list):
         unsupported = [
