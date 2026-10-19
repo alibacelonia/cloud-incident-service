@@ -25,16 +25,20 @@
 - `orchestration/` defines the `Orchestrator` protocol and a `DeterministicOrchestrator` that
   queries every registered tool once and reports evidence, timeline, data-source status, and
   uncertainties for empty or failed sources. Correlated findings arrive in F-06.
-- `tools/` holds the read-only `ToolRegistry` and `ToolSession` and three fixture-backed tools:
-  `cloudwatch_signals`, `deployment_history`, and `infrastructure_changes` (D-8). Change tools apply
-  the 60-minute look-back (A-3).
+- `tools/` holds the read-only `ToolRegistry` and `ToolSession` and four fixture-backed tools:
+  `cloudwatch_signals`, `deployment_history`, `infrastructure_changes`, and `runbook_search` (D-8).
+  Change tools apply the 60-minute look-back (A-3). `runbooks.py` parses Markdown runbooks into
+  sections (`runbook:<id>:<section>`) and ranks them with a deterministic lexical retriever (D-1,
+  ADR-007): matched query terms score 1 in the title, 2 in the heading, and 1 in the body; ties go
+  to service-specific runbooks, then source ID. The deterministic orchestrator searches runbooks with
+  the reported symptoms and keeps runbook sections out of the event timeline.
 - `fixtures/` contains the synthetic JSON data, checked by a hygiene test (SEC-5).
 - `providers/` defines the provider protocol (`AIProvider.generate(prompt) -> str`), an offline mock,
   and the Bedrock adapter in `providers/bedrock.py`, which translates SDK failures into
   `ProviderInvocationError`.
 - `prompts/` stores prompt text outside Python code.
 
-Known gaps against the target: no runbook retrieval, correlation, trace, or evaluation harness. The provider protocol supports text only, not tool use.
+Known gaps against the target: no correlation, trace, or evaluation harness. The provider protocol supports text only, not tool use.
 
 ## Target MVP architecture
 
@@ -101,7 +105,7 @@ tests/
 - `ModelClient`: `async converse(system, messages, tools, limits) -> ModelTurn`, where `ModelTurn`
   is either text or tool-use requests plus token usage. The starter endpoints were removed in F-03 (D-4); `AIProvider`
   now serves only startup and `/health` checks until `ModelClient` replaces it in F-09.
-- `RunbookRetriever`: `search(query, limit) -> list[RunbookSection]`.
+- `RunbookRetriever`: `data_as_of` plus `search(service, query, limit) -> list[RankedSection]`.
 - `TraceSink`: `write(trace)`, with a file-based implementation and an in-memory one for tests.
 
 ## Data flow

@@ -21,11 +21,18 @@ FIXED_ID = UUID("00000000-0000-4000-8000-000000000042")
 FIXED_TIME = datetime(2026, 10, 19, 11, 5, tzinfo=UTC)
 
 
-def body(service="payments-api", environment="production", start="10:00", end="11:00", **extra):
+def body(
+    service="payments-api",
+    environment="production",
+    start="10:00",
+    end="11:00",
+    symptoms="Elevated 5xx errors",
+    **extra,
+):
     return {
         "service": service,
         "environment": environment,
-        "symptoms": "Elevated errors",
+        "symptoms": symptoms,
         "time_range": {"start": f"2026-10-19T{start}:00Z", "end": f"2026-10-19T{end}:00Z"},
         **extra,
     }
@@ -80,6 +87,7 @@ def test_faulty_deployment_scenario_returns_evidence(client: TestClient) -> None
         "cloudwatch_signals": "ok",
         "deployment_history": "ok",
         "infrastructure_changes": "empty",
+        "runbook_search": "ok",
     }
     assert report["timeline"] == [
         "metric:payments-api:m-pay-002",
@@ -90,7 +98,13 @@ def test_faulty_deployment_scenario_returns_evidence(client: TestClient) -> None
         "metric:payments-api:m-pay-004",
         "log:payments-api:l-pay-002",
     ]
-    assert [item["source_id"] for item in report["evidence"]] == report["timeline"]
+    events = [item for item in report["evidence"] if item["kind"] != "runbook_section"]
+    assert [item["source_id"] for item in events] == report["timeline"]
+    assert {item["source_id"] for item in report["evidence"]} - set(report["timeline"]) == {
+        "runbook:payments-5xx:diagnosis",
+        "runbook:payments-5xx:mitigation",
+        "runbook:payments-5xx:symptoms",
+    }
     assert report["uncertainties"] == [
         {
             "description": "No data from infrastructure_changes for this service and time range.",
@@ -98,7 +112,7 @@ def test_faulty_deployment_scenario_returns_evidence(client: TestClient) -> None
             "evidence_ids": [],
         }
     ]
-    deploy = report["evidence"][1]
+    deploy = events[1]
     assert deploy["summary"] == "Deployment d-0042 of version 1.8.0 from 1.7.3: succeeded"
     assert deploy["attributes"]["finished_at"] == "2026-10-19T10:08:00+00:00"
 
@@ -150,11 +164,16 @@ def test_malformed_source_is_excluded_and_report_partial(client: TestClient) -> 
 
 
 def test_service_without_data_returns_empty_sources(client: TestClient) -> None:
-    report = investigate(client, body("search-api"))
+    report = investigate(client, body("search-api", symptoms="zzz unknown"))
 
     assert report["status"] == "complete"
     assert set(statuses(report).values()) == {"empty"}
     assert report["evidence"] == []
+    assert {
+        "description": "No runbook matched the reported symptoms.",
+        "tool": "runbook_search",
+        "evidence_ids": [],
+    } in report["uncertainties"]
     assert report["summary"] == (
         "No evidence was collected for search-api in production, so no findings could be made."
     )
@@ -177,7 +196,8 @@ def test_default_service_is_wired_without_overrides() -> None:
     response = TestClient(app).post("/v1/investigations", json=body())
 
     assert response.status_code == 200
-    assert len(response.json()["evidence"]) == 7
+    assert len(response.json()["timeline"]) == 7
+    assert len(response.json()["evidence"]) == 10
 
 
 def test_no_registered_tools_returns_partial_report() -> None:

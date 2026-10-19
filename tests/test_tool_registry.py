@@ -164,6 +164,7 @@ def test_default_registry_contains_only_the_read_only_fixture_tools() -> None:
         "cloudwatch_signals",
         "deployment_history",
         "infrastructure_changes",
+        "runbook_search",
     ]
 
 
@@ -171,6 +172,7 @@ def test_fixture_tools_return_identical_results_on_repeat() -> None:
     session = build_default_registry().session()
 
     async def run_all():
-        return [await session.invoke(name, ARGUMENTS) for name in session.tool_names]
+        window_tools = [name for name in session.tool_names if name != "runbook_search"]
+        return [await session.invoke(name, ARGUMENTS) for name in window_tools]
 
     assert asyncio.run(run_all()) == asyncio.run(run_all())

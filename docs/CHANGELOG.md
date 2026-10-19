@@ -14,3 +14,4 @@ All notable project changes are recorded here.
 - Remove the starter endpoints `/v1/generate`, `/v1/rag`, `/v1/documents`, and `/v1/documents/preview` and the in-memory document store (D-4). Runbook retrieval returns in F-05 behind `runbook_search`.
 - Add the read-only tool registry and three fixture-backed tools (`cloudwatch_signals`, `deployment_history`, `infrastructure_changes`) with synthetic scenario data. Investigations now return evidence, an ordered timeline, and per-source status; unavailable or malformed sources make the report `partial`.
 - Reject report evidence that no tool returned during the investigation.
+- Add `runbook_search`: synthetic Markdown runbooks are split into sections with stable source IDs and ranked deterministically against the reported symptoms. Runbook text, including injected instructions, is returned as data only.

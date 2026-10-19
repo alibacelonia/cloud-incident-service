@@ -11,6 +11,8 @@ from cloud_incident_service.domain import (
 from cloud_incident_service.tools import ToolSession
 
 _FAILED = ("unavailable", "malformed")
+RUNBOOK_SEARCH = "runbook_search"
+RUNBOOK_SECTION = "runbook_section"
 
 
 class DeterministicOrchestrator:
@@ -19,13 +21,7 @@ class DeterministicOrchestrator:
     provenance = Provenance(orchestrator="deterministic", model="deterministic")
 
     async def investigate(self, request: IncidentRequest, tools: ToolSession) -> Findings:
-        arguments = {
-            "service": request.service,
-            "environment": request.environment,
-            "start": request.time_range.start,
-            "end": request.time_range.end,
-        }
-        results = [await tools.invoke(name, arguments) for name in tools.tool_names]
+        results = [await tools.invoke(name, _arguments(name, request)) for name in tools.tool_names]
         evidence = sorted(
             (item for result in results for item in result.evidence),
             key=lambda item: (item.timestamp, item.source_id),
@@ -35,10 +31,18 @@ class DeterministicOrchestrator:
             status="partial" if partial else "complete",
             summary=_summary(request, results, len(evidence)),
             evidence=evidence,
-            timeline=[item.source_id for item in evidence],
+            # The timeline holds events only; runbook sections are reference material.
+            timeline=[item.source_id for item in evidence if item.kind != RUNBOOK_SECTION],
             uncertainties=_uncertainties(results),
             data_sources=[DataSource(tool=result.tool, status=result.status) for result in results],
         )
+
+
+def _arguments(tool_name: str, request: IncidentRequest) -> dict[str, object]:
+    scope = {"service": request.service, "environment": request.environment}
+    if tool_name == RUNBOOK_SEARCH:
+        return {**scope, "query": request.symptoms}
+    return {**scope, "start": request.time_range.start, "end": request.time_range.end}
 
 
 def _summary(request: IncidentRequest, results: list[ToolResult], evidence_count: int) -> str:
@@ -58,12 +62,20 @@ def _uncertainties(results: list[ToolResult]) -> list[Uncertainty]:
             Uncertainty(description="No evidence sources are registered, so none were queried.")
         ]
     messages = {
-        "empty": "No data from {tool} for this service and time range.",
         "unavailable": "{tool} was unavailable, so its evidence is missing.",
         "malformed": "{tool} returned malformed data, which was excluded.",
     }
-    return [
-        Uncertainty(description=messages[result.status].format(tool=result.tool), tool=result.tool)
-        for result in results
-        if result.status in messages
-    ]
+    uncertainties = []
+    for result in results:
+        if result.status == "empty":
+            description = (
+                "No runbook matched the reported symptoms."
+                if result.tool == RUNBOOK_SEARCH
+                else f"No data from {result.tool} for this service and time range."
+            )
+        elif result.status in messages:
+            description = messages[result.status].format(tool=result.tool)
+        else:
+            continue
+        uncertainties.append(Uncertainty(description=description, tool=result.tool))
+    return uncertainties

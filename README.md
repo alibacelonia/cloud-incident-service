@@ -27,9 +27,11 @@ curl -X POST http://localhost:8000/v1/investigations \
   -d '{"service":"payments-api","environment":"production","symptoms":"Elevated 5xx errors after 10:05 UTC","time_range":{"start":"2026-10-19T10:00:00Z","end":"2026-10-19T11:00:00Z"}}'
 ```
 
-The response is a schema-validated incident report with the evidence collected by three read-only,
-fixture-backed tools (`cloudwatch_signals`, `deployment_history`, `infrastructure_changes`), an
-ordered timeline, and each source's status. Correlated facts and hypotheses are not produced yet.
+The response is a schema-validated incident report with the evidence collected by four read-only,
+fixture-backed tools (`cloudwatch_signals`, `deployment_history`, `infrastructure_changes`,
+`runbook_search`), an ordered timeline of events, and each source's status. `runbook_search` ranks
+sections of the synthetic Markdown runbooks in `src/cloud_incident_service/fixtures/runbooks/`
+against the reported symptoms; runbook sections appear as evidence but not in the timeline. Correlated facts and hypotheses are not produced yet.
 The synthetic fixtures (dated 2026-10-19, UTC) cover these scenarios:
 
 | Service | Window | What it shows |
@@ -38,6 +40,7 @@ The synthetic fixtures (dated 2026-10-19, UTC) cover these scenarios:
 | `checkout-api` | 14:00–15:00 | Security group change in the 60-minute look-back, then database errors |
 | `inventory-api` | 16:00–17:00 | `deployment_history` unavailable, so the report is `partial` |
 | `ledger-api` | 18:00–19:00 | Malformed deployment record excluded, so the report is `partial` |
+| `notify-api` | any | A runbook containing prompt-injection text, returned as data only |
 
 All fixtures are fictional. Invalid input
 (unknown environment, timestamps without a UTC offset, `end` not after `start`, a window over 24
