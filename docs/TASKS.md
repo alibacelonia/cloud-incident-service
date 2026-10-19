@@ -44,5 +44,11 @@ Each feature is a vertical slice that can be observed through the API or the tes
 README usage is updated within each feature that changes how the service is run or called.
 
 Verification (2026-10-19, F-11): `ruff format --check`, `ruff check`, `pytest` (316 passed, 3 live
-deselected), and both evaluations (10/10) pass locally through `uv run`. Live Bedrock tests have not
-been run in this repository's history; they require the owner's account.
+deselected), and both evaluations (10/10) pass locally through `uv run`.
+
+Live verification (2026-10-19, run by the owner with their account): Claude 3 Haiku
+(`anthropic.claude-3-haiku-20240307-v1:0`, `ca-central-1`) passed all three live tests and 10/10
+live evaluation scenarios, above the 80% threshold (D-6). Earlier live runs scored 0/10 (expired
+SSO credentials), 1/10, 3/10, and 6/10; the fixes are recorded in ADR-013, ADR-015, and ADR-012.
+One passing run is not a guarantee: model output varies between runs, so rerun the live suite
+after prompt, model, or rule changes.
