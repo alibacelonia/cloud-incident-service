@@ -24,3 +24,4 @@ All notable project changes are recorded here.
 - Add the model-driven orchestrator (`ORCHESTRATOR=model`): a bounded tool-use loop (8 tool calls, 6 turns, 60 seconds) over the read-only registry, with validated JSON answers, one repair attempt, and traced model turns. The model cites evidence by source ID only.
 - Replace the text-only provider with a tool-use `ModelClient`; the Bedrock adapter now uses Converse tool use with timeouts. An offline rule-based client runs the model path with `AI_PROVIDER=mock`.
 - Fix: token counts in traces were redacted as secrets, and a trace export error could fail an investigation.
+- Add opt-in live Amazon Bedrock tests (`pytest -m live` with `RUN_LIVE_TESTS=1`): a Converse smoke test, a model-driven investigation, and the full evaluation with an 80% pass threshold. Live tests are deselected by default and skip with a clear reason when not configured.

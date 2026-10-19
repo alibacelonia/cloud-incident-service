@@ -122,6 +122,28 @@ uv run pytest
 
 Tests inject a fake provider and never call a live model, AWS, or a vector database. A test guard fails any test that opens a network connection, and tests ignore your shell's AI and AWS settings.
 
+Default tests never call AWS: live tests are deselected unless you run them explicitly.
+
+### Live Amazon Bedrock tests (opt-in)
+
+Use only an AWS account you are authorized to use for this project. The live tests only invoke the
+configured model (read-only), cap output tokens, and are safe to rerun; they still incur Bedrock
+charges.
+
+```bash
+RUN_LIVE_TESTS=1 AI_MODEL=<model-or-inference-profile-id> AWS_REGION=<region> uv run pytest -m live -s
+```
+
+Credentials come from the default AWS credential chain (for example `AWS_PROFILE`). Without
+`RUN_LIVE_TESTS=1`, a model ID, a region, or credentials, each live test is skipped with the reason.
+The suite runs a Converse smoke test, one model-driven investigation, and the full evaluation, which
+must pass at least 80% of scenarios (D-6). The same evaluation is available from the CLI:
+
+```bash
+AI_PROVIDER=bedrock AI_MODEL=<model-id> AWS_REGION=<region> \
+  uv run python -m cloud_incident_service.evaluation --orchestrator model --min-pass-rate 0.8
+```
+
 ## Evaluation
 
 `src/cloud_incident_service/fixtures/evaluation_scenarios.json` defines ten synthetic scenarios

@@ -17,9 +17,15 @@ ISOLATED_VARIABLES = (
 )
 
 
+def is_live(request) -> bool:
+    return request.node.get_closest_marker("live") is not None
+
+
 @pytest.fixture(autouse=True)
-def isolated_environment(monkeypatch, tmp_path):
+def isolated_environment(request, monkeypatch, tmp_path):
     """Keep the developer's shell and AWS files from changing test outcomes."""
+    if is_live(request):
+        return  # Live tests deliberately use the developer's AWS configuration.
     for name in ISOLATED_VARIABLES:
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("AWS_CONFIG_FILE", str(tmp_path / "aws-config"))
@@ -32,8 +38,10 @@ class NetworkAccessBlocked(RuntimeError):
 
 
 @pytest.fixture(autouse=True)
-def block_network(monkeypatch):
+def block_network(request, monkeypatch):
     """Fail any default test that tries to open a network connection (NFR-1)."""
+    if is_live(request):
+        return
 
     def refuse(*_args, **_kwargs):
         raise NetworkAccessBlocked("Network access is disabled in the default test suite")

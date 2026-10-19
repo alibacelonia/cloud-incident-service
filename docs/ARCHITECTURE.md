@@ -59,7 +59,7 @@
   hypothesis, sources, and safety (ADR-012). `python -m cloud_incident_service.evaluation` prints the
   results and exits non-zero below `--min-pass-rate`.
 
-Known gaps against the target: live Bedrock tests and live evaluation (F-10).
+Known gaps against the target: release documentation (F-11).
 
 ## Target MVP architecture
 
@@ -177,8 +177,11 @@ tests/
   orchestrator over fixtures.
 - **Evaluation:** `evaluation/` scenario runner, exercised by `tests/test_evaluation.py` and run in
   CI. The deterministic path must pass 100% of scenarios.
-- **Live:** `@pytest.mark.live`, deselected by default and skipped with a reason when not opted in
-  or configured.
+- **Live:** `tests/live/`, marked `live` and deselected by default (`addopts = "-m 'not live'"`).
+  With `-m live` they still skip with a reason unless `RUN_LIVE_TESTS=1`, `AI_MODEL`, `AWS_REGION`,
+  and AWS credentials are present. They exempt themselves from the offline guard and environment
+  isolation, invoke only Bedrock, and are bounded by small output-token caps, the 60-second loop
+  limit, and per-test timeouts. The live evaluation asserts the D-6 threshold of 80%.
 - A socket-blocking guard in `conftest.py` enforces offline default tests.
 
 ## Deployment approach

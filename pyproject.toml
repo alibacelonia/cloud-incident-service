@@ -23,6 +23,9 @@ packages = ["src/cloud_incident_service"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Live tests call Amazon Bedrock; they are deselected unless run with `-m live` (NFR-3).
+addopts = "-m 'not live'"
+markers = ["live: calls Amazon Bedrock; opt-in with RUN_LIVE_TESTS=1 and `pytest -m live`"]
 
 [tool.ruff]
 line-length = 100
