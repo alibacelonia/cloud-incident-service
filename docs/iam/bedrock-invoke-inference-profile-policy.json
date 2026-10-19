@@ -1,0 +1,14 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "InvokeConfiguredInferenceProfileOnly",
+      "Effect": "Allow",
+      "Action": "bedrock:InvokeModel",
+      "Resource": [
+        "arn:aws:bedrock:<region>:<account-id>:inference-profile/<inference-profile-id>",
+        "arn:aws:bedrock:*::foundation-model/<model-id>"
+      ]
+    }
+  ]
+}

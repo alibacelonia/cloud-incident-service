@@ -33,9 +33,13 @@ Each feature is a vertical slice that can be observed through the API or the tes
 | F-08 | P0 | done | Evaluation harness with the seven FR-8 scenarios | F-06, F-07 | AC-10; the runner reports schema validity, citation validity, hypothesis match, and safety per scenario |
 | F-09 | P1 | done | `ModelClient` protocol, scripted offline client, Bedrock Converse tool-use adapter, and the bounded `ModelOrchestrator` | F-08 | A-7 limits enforced and tested; unregistered tool requests refused and traced; D-7 repair behaviour tested; prompt-injection scenario passes with scripted turns |
 | F-10 | P1 | done | Opt-in live Bedrock tests and live evaluation | F-09, D-6 values | AC-12; runs bounded by time and tokens; results reported against D-6 thresholds |
-| F-11 | P1 | todo | Release documentation: security posture, Bedrock IAM policy example, CHANGELOG | F-10 | SEC-8 policy example; a new contributor can run an investigation from the README; AC-14, AC-15 |
+| F-11 | P1 | in-progress (awaiting owner verification) | Release documentation: security posture, Bedrock IAM policy example, CHANGELOG | F-10 | SEC-8 policy example; a new contributor can run an investigation from the README; AC-14, AC-15 |
 | P-01 | P2 | todo | Design human approval before any side-effecting tool | MVP complete | A new ADR covers approval flow, audit trail, and authorization; no side-effecting tool exists until it is accepted |
 | P-02 | P2 | todo | Real AWS read-only adapters behind the tool protocols | MVP complete | Adapters live outside the domain layer; least-privilege IAM documented; covered by opt-in live tests only |
 | P-03 | P2 | todo | Direct Anthropic API `ModelClient` adapter | F-09 | Separate adapter with offline tests; live use is opt-in |
 
 README usage is updated within each feature that changes how the service is run or called.
+
+Verification (2026-10-19, F-11): `ruff format --check`, `ruff check`, `pytest` (316 passed, 3 live
+deselected), and both evaluations (10/10) pass locally through `uv run`. Live Bedrock tests have not
+been run in this repository's history; they require the owner's account.

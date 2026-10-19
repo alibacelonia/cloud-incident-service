@@ -30,14 +30,14 @@
 
 ## ADR-005: Tool-use capable model client protocol
 
-- **Status:** accepted (2026-10-19)
+- **Status:** accepted (2026-10-19); implemented in F-09, where `AIProvider` was removed rather than kept alongside (see ADR-013)
 - **Context:** The existing `AIProvider.generate(prompt) -> str` cannot express tool specifications, tool-use requests, or token usage. The Bedrock adapter blocks the event loop by calling synchronous boto3 from an `async` method.
 - **Decision:** Add a `ModelClient` protocol (`converse(system, messages, tools, limits) -> ModelTurn`) with a scripted offline implementation for tests and a Bedrock Converse implementation that runs boto3 calls in a worker thread. Keep `AIProvider` only while the starter endpoints exist.
 - **Consequences:** Model-driven orchestration can be tested offline with scripted turns. Two provider abstractions coexist temporarily. A future direct Anthropic adapter would implement `ModelClient`.
 
 ## ADR-006: Local JSON trace export with redaction
 
-- **Status:** accepted (2026-10-19)
+- **Status:** accepted (2026-10-19); refined by ADR-011
 - **Context:** Investigations need a trace for debugging and evaluation. `project.yaml` sets `database: null` and prioritises low cost and offline development. Traces must never contain secrets.
 - **Decision:** A `TraceRecorder` captures steps in memory. A `Redactor` removes access key identifiers, 12-digit account identifiers, email addresses, and bearer tokens. A `TraceSink` writes one JSON file per investigation to a configurable, git-ignored directory. Writing is disabled unless the directory is configured. Tests use an in-memory sink or a temporary directory.
 - **Consequences:** No new infrastructure is needed. Traces are not queryable, and retention is manual. Pattern-based redaction is defence in depth; the primary control is that secrets never enter tool fixtures or prompts.
@@ -107,3 +107,10 @@
   - An answer that fails validation (malformed JSON, unknown citations, `requires_human_approval: false`, cut off at the token limit, or blocked by content filters) gets one repair message listing the validation errors without input values. A second failure raises `invalid_model_output` (HTTP 502); turn limits raise `model_turn_limit` (502) and timeouts `model_timeout` (504). Model turns (stop reason, requested tools, tokens, latency) and validation outcomes are traced.
   - `RuleBasedModelClient` stands in for a model when `AI_PROVIDER=mock`: it requests every tool, then answers with the deterministic findings derived from the tool payloads it received, so the full model path and the evaluation harness run offline.
 - **Consequences:** Model output can only add analysis over verified evidence, and every failure mode is bounded and observable. The offline stand-in validates plumbing, not model quality; live quality is measured in F-10. Validation-driven repair costs at most one extra turn.
+
+## ADR-014: Local-only, unauthenticated MVP API
+
+- **Status:** accepted (2026-10-19; implements D-5, SEC-7)
+- **Context:** `AGENTS.md` requires authorization boundaries to be validated, but the MVP is a single-user portfolio service that runs on a developer machine against synthetic data, with no deployment target (`deployment.provider: local`).
+- **Decision:** The MVP API has no authentication or authorization. It is documented to run only on `127.0.0.1` (the uvicorn default), and `docs/SECURITY.md` lists authentication, authorization, TLS, edge rate and size limits, audit logging, and managed secrets as prerequisites for any non-local deployment. The remaining boundaries are enforced in code: input validation, the read-only tool registry, approval-gated remediation, and redaction.
+- **Consequences:** No identity or tenancy code is written speculatively. Anyone who can reach the port can run investigations and spend Bedrock tokens when the model orchestrator is enabled, which is why the service must not be exposed. Adding authentication later is a contained change at the FastAPI boundary.

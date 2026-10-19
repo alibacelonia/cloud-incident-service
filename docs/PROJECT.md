@@ -4,6 +4,9 @@
 > Items tagged **[A-n]** follow a confirmed default and items tagged **[D-n]** follow a recorded
 > decision; both are listed at the end of this document. `docs/HANDOFF.md` is
 > context only; this document and `project.yaml` are authoritative.
+>
+> **Implementation:** all MVP features (F-01 to F-11) are delivered; see `docs/TASKS.md`. Live
+> Bedrock results depend on the owner's account and are not part of the default test suite.
 
 ## Project overview
 
