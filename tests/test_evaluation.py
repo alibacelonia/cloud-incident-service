@@ -200,7 +200,8 @@ def test_failed_model_answers_explain_the_last_rejection() -> None:
                 stop_reason="end_turn",
                 content=[
                     TextBlock(
-                        text='{"summary": "x", "facts": [{"statement": "y", "evidence_ids": []}]}'
+                        text='{"summary": "x", "facts": '
+                        '[{"statement": "y", "evidence_ids": ["z:a:b"]}]}'
                     )
                 ],
             )
@@ -211,4 +212,4 @@ def test_failed_model_answers_explain_the_last_rejection() -> None:
 
     detail = result.checks["schema"].detail
     assert detail.startswith("ModelInvestigationError: invalid_model_output; last rejected answer:")
-    assert "facts.0.evidence_ids: List should have at least 1 item" in detail
+    assert "references unknown evidence: z:a:b" in detail

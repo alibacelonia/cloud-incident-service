@@ -150,7 +150,7 @@ def test_model_driven_investigation_produces_validated_report() -> None:
     assert report.provenance.model_dump() == {
         "orchestrator": "model",
         "model": "scripted-model",
-        "prompt_version": "investigation_v2",
+        "prompt_version": "investigation_v3",
     }
     assert report.hypotheses[0].confidence == "medium"
     assert report.remediation_proposals[0].requires_human_approval is True
@@ -338,7 +338,7 @@ def test_repair_request_lists_the_citable_source_ids() -> None:
     assert "deploy:payments-api:d-0042" in repair
 
 
-def test_repair_request_without_evidence_says_findings_must_be_empty() -> None:
+def test_hypothesis_without_evidence_is_repaired_with_no_evidence_hint() -> None:
     no_data = {"service": "search-api", "environment": "production", **WINDOW}
     request = IncidentRequest.model_validate(
         {
@@ -348,7 +348,18 @@ def test_repair_request_without_evidence_says_findings_must_be_empty() -> None:
             "time_range": WINDOW,
         }
     )
-    bad = {"summary": "Nothing found.", "facts": [{"statement": "No data.", "evidence_ids": []}]}
+    bad = {
+        "summary": "Nothing found.",
+        "hypotheses": [
+            {
+                "id": "h-1",
+                "statement": "A hidden change.",
+                "supporting_evidence_ids": [],
+                "confidence": "low",
+                "rationale": "Guess.",
+            }
+        ],
+    }
     good = {
         "summary": "No evidence was found.",
         "uncertainties": [{"description": "No data.", "evidence_ids": []}],
@@ -359,8 +370,29 @@ def test_repair_request_without_evidence_says_findings_must_be_empty() -> None:
 
     report, _ = investigate(client, request=request)
 
-    assert "facts and hypotheses must be empty lists" in client.calls[2][-1].content[0].text
-    assert report.facts == []
+    repair = client.calls[2][-1].content[0].text
+    assert "needs at least one source_id" in repair
+    assert "facts and hypotheses must be empty lists" in repair
+    assert "There is no abnormal signal" in repair
+    assert report.hypotheses == []
+
+
+def test_facts_without_evidence_become_uncertainties() -> None:
+    unsupported = GOOD_ANSWER | {
+        "facts": [
+            *GOOD_ANSWER["facts"],
+            {"statement": "No infrastructure changes were recorded.", "evidence_ids": []},
+        ]
+    }
+    client = ScriptedModelClient(INVESTIGATE, answer(unsupported))
+
+    report, trace = investigate(client)
+
+    assert [fact.statement for fact in report.facts] == ["Deployment d-0042 started at 10:05 UTC."]
+    assert "No infrastructure changes were recorded." in [
+        item.description for item in report.uncertainties
+    ]
+    assert all(item.passed for item in trace.validations)
 
 
 def test_unknown_citation_is_explained_in_the_repair_request() -> None:
@@ -534,7 +566,7 @@ def test_api_runs_the_model_orchestrator_offline(monkeypatch) -> None:
     assert body["provenance"] == {
         "orchestrator": "model",
         "model": "rule-based-mock",
-        "prompt_version": "investigation_v2",
+        "prompt_version": "investigation_v3",
     }
     assert body["hypotheses"][0]["confidence"] == "high"
 

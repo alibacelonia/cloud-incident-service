@@ -28,6 +28,11 @@ from cloud_incident_service.domain import (
     Uncertainty,
 )
 from cloud_incident_service.orchestration.findings import summarize_sources
+from cloud_incident_service.orchestration.grounding import (
+    CorrelationContext,
+    order_hypotheses,
+    rule_violations,
+)
 from cloud_incident_service.prompts import PromptTemplate, load_prompt
 from cloud_incident_service.providers import (
     Message,
@@ -40,7 +45,7 @@ from cloud_incident_service.providers import (
 )
 from cloud_incident_service.tools import ToolInputError, ToolNotRegisteredError, ToolSession
 
-PROMPT_VERSION = "investigation_v2"
+PROMPT_VERSION = "investigation_v3"
 DEFAULT_MAX_OUTPUT_TOKENS = 2_048
 REPAIR_DETAIL_LIMIT = 1_000
 REPAIR_SOURCE_ID_LIMIT = 1_500
@@ -68,6 +73,10 @@ class ModelInvestigationError(RuntimeError):
         self.message = message
         self.kind = kind
         super().__init__(f"{code}: {message}")
+
+
+class ProductRuleError(ValueError):
+    """The answer is well-formed but breaks the correlation rules (ADR-015)."""
 
 
 class ModelFindings(BaseModel):
@@ -148,7 +157,10 @@ class ModelOrchestrator:
                         "invalid_output",
                     ) from None
                 repaired = True
-                repair = repair_request(exc, sorted(tools.returned_evidence))
+                context = CorrelationContext.from_events(
+                    summarize_sources(request, tools.results).events
+                )
+                repair = repair_request(exc, sorted(tools.returned_evidence), context.describe())
                 messages.append(Message(role="user", content=[TextBlock(text=repair)]))
                 continue
             tools.record_validation("model_output")
@@ -183,7 +195,7 @@ class ModelOrchestrator:
         written = ModelFindings.model_validate(answer)
         sources = summarize_sources(request, tools.results)
         # Evidence, timeline, statuses, and source gaps come from the tools, never the model.
-        return Findings(
+        findings = Findings(
             status=sources.status,
             summary=written.summary,
             evidence=sources.evidence,
@@ -199,6 +211,15 @@ class ModelOrchestrator:
             remediation_proposals=written.remediation_proposals,
             data_sources=sources.data_sources,
         )
+        evidence_by_id = {item.source_id: item for item in sources.evidence}
+        context = CorrelationContext.from_events(sources.events)
+        problems = rule_violations(
+            findings.hypotheses, findings.remediation_proposals, evidence_by_id, context
+        )
+        if problems:
+            raise ProductRuleError("; ".join(problems))
+        ordered = order_hypotheses(findings.hypotheses, evidence_by_id)
+        return findings.model_copy(update={"hypotheses": ordered})
 
 
 def render_request(request: IncidentRequest) -> str:
@@ -234,9 +255,28 @@ def extract_json(text: str) -> str:
 
 
 def normalize_answer(data: Any) -> Any:
-    """Lowercase enumerated values that models often capitalize; nothing else is changed."""
+    """Safe, claim-reducing clean-up of a model answer.
+
+    Enumerated values are lowercased, and a "fact" without evidence becomes an uncertainty,
+    because a statement without evidence is not a fact (FR-5 rule 2). Nothing is added.
+    """
     if not isinstance(data, dict):
         return data
+    facts = data.get("facts")
+    if isinstance(facts, list):
+        unsupported = [
+            item for item in facts if isinstance(item, dict) and not item.get("evidence_ids")
+        ]
+        if unsupported:
+            data["facts"] = [item for item in facts if item not in unsupported]
+            uncertainties = data.get("uncertainties")
+            data["uncertainties"] = [
+                *(uncertainties if isinstance(uncertainties, list) else []),
+                *(
+                    {"description": item.get("statement", ""), "evidence_ids": []}
+                    for item in unsupported
+                ),
+            ]
     for key, field in (("hypotheses", "confidence"), ("remediation_proposals", "risk")):
         items = data.get(key)
         if isinstance(items, list):
@@ -248,6 +288,8 @@ def normalize_answer(data: Any) -> Any:
 
 def _explain(item: Any) -> str:
     """Validation messages a model can act on; raw regex patterns are replaced."""
+    if item["type"] == "too_short" and any("evidence_ids" in str(part) for part in item["loc"]):
+        return "needs at least one source_id; a statement without evidence belongs in uncertainties"
     if item["type"] != "string_pattern_mismatch":
         return item["msg"]
     location = [str(part) for part in item["loc"]]
@@ -258,7 +300,9 @@ def _explain(item: Any) -> str:
     return "has an invalid format"
 
 
-def repair_request(error: Exception, valid_source_ids: list[str] | None = None) -> str:
+def repair_request(
+    error: Exception, valid_source_ids: list[str] | None = None, correlation: str = ""
+) -> str:
     if isinstance(error, ValidationError):
         problems = "; ".join(
             f"{'.'.join(str(part) for part in item['loc']) or 'root'}: {_explain(item)}"
@@ -274,9 +318,10 @@ def repair_request(error: Exception, valid_source_ids: list[str] | None = None) 
         if ids
         else "The tools returned no evidence, so facts and hypotheses must be empty lists."
     )
+    context = f" {correlation}" if correlation else ""
     return (
         "Your previous reply could not be accepted: "
-        f"{problems[:REPAIR_DETAIL_LIMIT]}. {citable} "
+        f"{problems[:REPAIR_DETAIL_LIMIT]}. {citable}{context} "
         "Reply again with only the corrected JSON object."
     )
 

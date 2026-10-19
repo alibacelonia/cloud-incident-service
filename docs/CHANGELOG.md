@@ -38,8 +38,10 @@ First release of the incident investigation service, built from the `ai-service`
 
 ### Changed
 
-- Model prompt `investigation_v2` with explicit answer rules; repair messages list citable source
-  IDs and explain format errors; evaluation failures and traces include validation messages.
+- Model answers are checked against the same correlation rules as the deterministic path
+  (ADR-015); prompt `investigation_v3` states them. Repair messages list the citable source IDs,
+  the first abnormal signal, and the candidate changes, and explain format errors. Facts without
+  evidence become uncertainties. Evaluation failures and traces include validation messages.
 
 ### Removed
 

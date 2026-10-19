@@ -38,11 +38,11 @@ Evaluation runner (evaluation/) -> InvestigationService over fixtures/evaluation
 | `config.py` | `Settings` from environment variables; `ConfigurationError` names variables, never values (ADR-008) |
 | `domain/` | Request, evidence, tool result, and report models; FR-5 cross-reference validators. `Findings` is what an orchestrator concludes; `IncidentReport` adds identity, request, provenance, and request-scoped checks |
 | `application/` | `InvestigationService`: redacts symptoms, opens a `ToolSession` per investigation, assembles and validates the report, rejects evidence no tool returned (ADR-009), records and exports the trace |
-| `orchestration/` | `Orchestrator` protocol; `DeterministicOrchestrator` with rule-based findings (ADR-010); `ModelOrchestrator` (ADR-013); `RuleBasedModelClient`; `build_orchestrator` |
+| `orchestration/` | `Orchestrator` protocol; `DeterministicOrchestrator` with rule-based findings (ADR-010); `ModelOrchestrator` (ADR-013) whose hypotheses are checked against the correlation rules in `grounding.py` (ADR-015); `RuleBasedModelClient`; `build_orchestrator` |
 | `correlation/` | Pure rules: abnormal signals and onset, changes within 30 minutes before onset (A-3), stale sources (A-4), contradictions via shared `entity` attributes (A-5), instruction-like text (ADR-012) |
 | `tools/` | `Tool` protocol, `ToolRegistry`, `ToolSession`, the four fixture-backed tools (D-8), runbook parsing and retrieval (D-1, ADR-007) |
 | `providers/` | `ModelClient` protocol and conversation types; `BedrockModelClient` with timeouts and safe error mapping |
-| `prompts/` | Versioned prompt templates; `investigation_v2.txt` is current, earlier versions are kept for comparison |
+| `prompts/` | Versioned prompt templates; `investigation_v3.txt` is current, earlier versions are kept for comparison |
 | `tracing/` | `InvestigationTrace`, `TraceRecorder`, `FileTraceSink`, `InMemoryTraceSink`, `TRACE_DIR` checks (D-3, ADR-006, ADR-011) |
 | `redaction.py` | Pattern-based secret redaction for tool output, symptoms, and traces (ADR-011) |
 | `fixtures/` | Synthetic tool data, runbooks, and evaluation scenarios (package data, hygiene-tested) |
