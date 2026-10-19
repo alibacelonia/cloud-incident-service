@@ -32,7 +32,7 @@ Each feature is a vertical slice that can be observed through the API or the tes
 | F-07 | P0 | done | Investigation trace with redaction and JSON file export (D-3) | F-06 | AC-9; trace directory is configurable, git-ignored, and validated under NFR-8 |
 | F-08 | P0 | done | Evaluation harness with the seven FR-8 scenarios | F-06, F-07 | AC-10; the runner reports schema validity, citation validity, hypothesis match, and safety per scenario |
 | F-09 | P1 | done | `ModelClient` protocol, scripted offline client, Bedrock Converse tool-use adapter, and the bounded `ModelOrchestrator` | F-08 | A-7 limits enforced and tested; unregistered tool requests refused and traced; D-7 repair behaviour tested; prompt-injection scenario passes with scripted turns |
-| F-10 | P1 | in-progress (awaiting owner verification) | Opt-in live Bedrock tests and live evaluation | F-09, D-6 values | AC-12; runs bounded by time and tokens; results reported against D-6 thresholds |
+| F-10 | P1 | done | Opt-in live Bedrock tests and live evaluation | F-09, D-6 values | AC-12; runs bounded by time and tokens; results reported against D-6 thresholds |
 | F-11 | P1 | todo | Release documentation: security posture, Bedrock IAM policy example, CHANGELOG | F-10 | SEC-8 policy example; a new contributor can run an investigation from the README; AC-14, AC-15 |
 | P-01 | P2 | todo | Design human approval before any side-effecting tool | MVP complete | A new ADR covers approval flow, audit trail, and authorization; no side-effecting tool exists until it is accepted |
 | P-02 | P2 | todo | Real AWS read-only adapters behind the tool protocols | MVP complete | Adapters live outside the domain layer; least-privilege IAM documented; covered by opt-in live tests only |
