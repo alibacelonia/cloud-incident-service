@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from typing import Any
 
 from cloud_incident_service.config import ConfigurationError, Settings
 
@@ -28,6 +29,27 @@ def live_skip_reason(environ: Mapping[str, str]) -> str | None:
         live_settings(environ)
     except ConfigurationError as exc:
         return f"invalid live configuration: {exc}"
+    return None
+
+
+def credentials_skip_reason(session: Any) -> str | None:
+    """Why AWS credentials cannot be used, or None when they load.
+
+    Credentials are resolved eagerly: SSO and assume-role credentials load lazily, so an expired
+    session would otherwise pass this check and fail on every Bedrock call instead.
+    """
+    from botocore.exceptions import BotoCoreError
+
+    try:
+        credentials = session.get_credentials()
+        if credentials is None:
+            return "AWS credentials were not found in the default credential chain"
+        credentials.get_frozen_credentials()
+    except BotoCoreError as exc:
+        return (
+            f"AWS credentials could not be loaded ({type(exc).__name__}); "
+            "for an SSO profile, run `aws sso login --profile <profile>` and retry"
+        )
     return None
 
 

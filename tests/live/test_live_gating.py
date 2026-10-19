@@ -4,7 +4,13 @@ import tomllib
 from pathlib import Path
 
 import pytest
-from live_support import LIVE_PASS_THRESHOLD, live_settings, live_skip_reason
+from botocore.exceptions import ProfileNotFound, TokenRetrievalError
+from live_support import (
+    LIVE_PASS_THRESHOLD,
+    credentials_skip_reason,
+    live_settings,
+    live_skip_reason,
+)
 
 CONFIGURED = {"RUN_LIVE_TESTS": "1", "AI_MODEL": "example.model-v1:0", "AWS_REGION": "us-east-1"}
 
@@ -54,3 +60,52 @@ def test_live_tests_are_deselected_by_default() -> None:
 
     assert options["addopts"] == "-m 'not live'"
     assert any(marker.startswith("live:") for marker in options["markers"])
+
+
+class FakeCredentials:
+    def __init__(self, error: Exception | None = None) -> None:
+        self.error = error
+
+    def get_frozen_credentials(self):
+        if self.error is not None:
+            raise self.error
+        return object()
+
+
+class FakeSession:
+    def __init__(self, credentials=None, error: Exception | None = None) -> None:
+        self.credentials = credentials
+        self.error = error
+
+    def get_credentials(self):
+        if self.error is not None:
+            raise self.error
+        return self.credentials
+
+
+def test_credentials_that_load_enable_live_tests() -> None:
+    assert credentials_skip_reason(FakeSession(FakeCredentials())) is None
+
+
+def test_missing_credentials_skip_live_tests() -> None:
+    assert credentials_skip_reason(FakeSession(None)) == (
+        "AWS credentials were not found in the default credential chain"
+    )
+
+
+@pytest.mark.parametrize(
+    "session",
+    [
+        # An expired SSO session: credentials exist but fail when resolved.
+        FakeSession(
+            FakeCredentials(TokenRetrievalError(provider="sso", error_msg="Token has expired"))
+        ),
+        FakeSession(error=ProfileNotFound(profile="missing")),
+    ],
+    ids=["expired-sso", "unknown-profile"],
+)
+def test_unloadable_credentials_skip_with_login_hint(session) -> None:
+    reason = credentials_skip_reason(session)
+
+    assert reason.startswith("AWS credentials could not be loaded (")
+    assert "aws sso login" in reason

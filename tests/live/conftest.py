@@ -1,7 +1,7 @@
 import os
 
 import pytest
-from live_support import live_settings, live_skip_reason
+from live_support import credentials_skip_reason, live_settings, live_skip_reason
 
 from cloud_incident_service.config import Settings
 
@@ -16,6 +16,7 @@ def bedrock_settings() -> Settings:
 
     import boto3
 
-    if boto3.session.Session(region_name=settings.aws_region).get_credentials() is None:
-        pytest.skip("AWS credentials were not found in the default credential chain")
+    reason = credentials_skip_reason(boto3.session.Session(region_name=settings.aws_region))
+    if reason is not None:
+        pytest.skip(reason)
     return settings
