@@ -1,6 +1,8 @@
 {
   "data_as_of": "2026-10-19T23:59:00Z",
-  "unavailable": ["inventory-api/production"],
+  "unavailable": [
+    "inventory-api/production"
+  ],
   "deployments": [
     {
       "id": "d-0039",
@@ -61,6 +63,26 @@
       "status": "exploded",
       "started_at": "2026-10-19T18:02:00Z",
       "finished_at": "2026-10-19T18:04:00Z"
+    },
+    {
+      "id": "d-0700",
+      "service": "cart-api",
+      "environment": "production",
+      "version": "5.4.0",
+      "previous_version": "5.3.2",
+      "status": "succeeded",
+      "started_at": "2026-10-19T11:00:00Z",
+      "finished_at": "2026-10-19T11:04:00Z"
+    },
+    {
+      "id": "d-0610",
+      "service": "auth-api",
+      "environment": "production",
+      "version": "2.3.0",
+      "previous_version": "2.2.1",
+      "status": "succeeded",
+      "started_at": "2026-10-19T15:00:00Z",
+      "finished_at": "2026-10-19T15:03:00Z"
     }
   ]
 }

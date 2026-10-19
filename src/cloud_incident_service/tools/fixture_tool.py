@@ -27,8 +27,9 @@ class FixtureRecord(BaseModel):
 class FixtureTool:
     """Read-only tool backed by a packaged JSON fixture (ADR-004).
 
-    The fixture holds `data_as_of`, an optional `unavailable` list of `service/environment`
-    keys that simulate an outage, and one list per collection. Records are filtered by
+    The fixture holds `data_as_of` (optionally overridden per `service/environment` key in
+    `data_as_of_overrides`), an optional `unavailable` list of `service/environment` keys that
+    simulate an outage, and one list per collection. Records are filtered by
     service, environment, and time window; records whose timestamp cannot be parsed are kept
     so that output validation reports them as malformed instead of silently dropping them.
     """
@@ -49,11 +50,13 @@ class FixtureTool:
 
     async def run(self, query: IncidentWindowQuery) -> dict[str, Any]:
         data = json.loads(self._fixture.read_text(encoding="utf-8"))
-        if f"{query.service}/{query.environment}" in data.get("unavailable", []):
+        scope = f"{query.service}/{query.environment}"
+        if scope in data.get("unavailable", []):
             raise ToolUnavailableError(f"{self.name} is unavailable for this service")
 
         window_start = query.start - self.lookback
-        output: dict[str, Any] = {"data_as_of": data.get("data_as_of")}
+        data_as_of = data.get("data_as_of_overrides", {}).get(scope, data.get("data_as_of"))
+        output: dict[str, Any] = {"data_as_of": data_as_of}
         for collection, timestamp_field in self.collections.items():
             output[collection] = [
                 record

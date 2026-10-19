@@ -31,13 +31,19 @@ The response is a schema-validated incident report with the evidence collected b
 fixture-backed tools (`cloudwatch_signals`, `deployment_history`, `infrastructure_changes`,
 `runbook_search`), an ordered timeline of events, and each source's status. `runbook_search` ranks
 sections of the synthetic Markdown runbooks in `src/cloud_incident_service/fixtures/runbooks/`
-against the reported symptoms; runbook sections appear as evidence but not in the timeline. Correlated facts and hypotheses are not produced yet.
+against the reported symptoms; runbook sections appear as evidence but not in the timeline. The report correlates that evidence: facts cite evidence, hypotheses name a change that started up
+to 30 minutes before the first abnormal signal (an alarm entering ALARM or an error log) with a
+confidence level and rationale, and remediation proposals always require human approval.
 The synthetic fixtures (dated 2026-10-19, UTC) cover these scenarios:
 
 | Service | Window | What it shows |
 | --- | --- | --- |
 | `payments-api` | 10:00–11:00 | Deployment followed by 5xx alarm, metrics, and error logs |
 | `checkout-api` | 14:00–15:00 | Security group change in the 60-minute look-back, then database errors |
+| `orders-api` | 10:00–11:00 | Two correlated changes, so two medium-confidence hypotheses |
+| `cart-api` | 12:00–13:00 | Abnormal signals with no correlated change |
+| `billing-api` | 10:00–11:00 | `cloudwatch_signals` data is stale |
+| `auth-api` | 15:00–16:00 | Deployment record contradicted by a log, so low confidence and no remediation |
 | `inventory-api` | 16:00–17:00 | `deployment_history` unavailable, so the report is `partial` |
 | `ledger-api` | 18:00–19:00 | Malformed deployment record excluded, so the report is `partial` |
 | `notify-api` | any | A runbook containing prompt-injection text, returned as data only |

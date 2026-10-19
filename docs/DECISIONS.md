@@ -62,3 +62,16 @@
 - **Context:** Reports must cite only evidence that a tool returned during the same investigation. A model-driven orchestrator (F-09) could otherwise invent or alter evidence that still passes schema validation. The registry is long-lived and must not hold per-request state.
 - **Decision:** `ToolRegistry.session()` creates a `ToolSession` for each investigation. The orchestrator receives the session and may call tools only through it. The session records every `ToolResult` and the evidence returned. After assembling the report, `InvestigationService` rejects any evidence item that is not identical to one the session recorded (`UnverifiedEvidenceError`). Tools return raw output; the session validates it against the tool's typed output model, so schema failures become `malformed` results rather than exceptions.
 - **Consequences:** Provenance is enforced in code for every orchestrator. The orchestrator protocol now takes the session (`investigate(request, tools)`). The session is the natural hook for trace recording in F-07. Fixture timestamps are filtered leniently so that unparsable records surface as `malformed` instead of disappearing.
+
+## ADR-010: Deterministic findings rules
+
+- **Status:** accepted (2026-10-19; implements FR-3, FR-4, FR-5, A-3 to A-6)
+- **Context:** The deterministic orchestrator must produce explainable, reproducible findings that the evaluation harness (F-08) can score, and that a model-driven orchestrator (F-09) can be compared against. Every claim must cite evidence, and unsupported causes must not be presented as facts.
+- **Decision:**
+  - An abnormal signal is an alarm entering `ALARM` or an `ERROR` log event. Metric datapoints are context only, because no thresholds are defined. The onset is the earliest abnormal signal.
+  - A change (deployment or infrastructure change) is a candidate cause when it starts at most 30 minutes before the onset. Each candidate becomes a hypothesis supported by the change and the abnormal signals at or after it.
+  - Confidence: `low` when other evidence reports a different state for the change's entity; `high` when it is the only candidate, both an alarm and an error log followed it, and every change source answered; otherwise `medium`. Hypotheses are ordered by confidence, then by closeness to the onset.
+  - Contradictions are detected through shared `entity` and `entity_state` evidence attributes (deployment records and structured deployment log fields).
+  - Facts are restricted to direct restatements of evidence (onset, correlated changes, alarms, error-log counts). Remediation is proposed only for medium or high hypotheses, only when a safe reversal is known (a succeeded deployment with a previous version, or an infrastructure change), and always with `requires_human_approval: true`.
+  - Runbook sections are recommended only when abnormal signals exist, phrased as "confirm its guidance applies before acting", because runbook text is untrusted.
+- **Consequences:** Findings are explainable and testable but heuristic: causes outside recorded changes (dependencies, traffic) appear only as uncertainties and next steps, and lexical runbook matches can be imprecise. Changing a rule changes evaluation baselines, so rules are covered by scenario tests.

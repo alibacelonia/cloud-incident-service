@@ -15,3 +15,5 @@ All notable project changes are recorded here.
 - Add the read-only tool registry and three fixture-backed tools (`cloudwatch_signals`, `deployment_history`, `infrastructure_changes`) with synthetic scenario data. Investigations now return evidence, an ordered timeline, and per-source status; unavailable or malformed sources make the report `partial`.
 - Reject report evidence that no tool returned during the investigation.
 - Add `runbook_search`: synthetic Markdown runbooks are split into sections with stable source IDs and ranked deterministically against the reported symptoms. Runbook text, including injected instructions, is returned as data only.
+- Correlate evidence into facts, hypotheses with confidence and rationale, next steps, and approval-gated remediation proposals. Stale sources are flagged, contradictory records lower confidence and block remediation, and failed sources make reports `partial`.
+- Add synthetic scenarios for multiple correlated changes, signals without a change, stale data, and contradictory records.

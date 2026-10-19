@@ -279,10 +279,13 @@ def payments_evidence(**overrides) -> Evidence:
         "kind": "deployment",
         "summary": "Deployment d-0042 of version 1.8.0 from 1.7.3: succeeded",
         "attributes": {
+            "deployment_id": "d-0042",
             "version": "1.8.0",
             "previous_version": "1.7.3",
             "status": "succeeded",
             "finished_at": "2026-10-19T10:08:00+00:00",
+            "entity": "deployment:d-0042",
+            "entity_state": "succeeded",
         },
     }
     data.update(overrides)

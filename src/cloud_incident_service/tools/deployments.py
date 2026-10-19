@@ -39,10 +39,14 @@ class Deployment(FixtureRecord):
             kind="deployment",
             summary=f"Deployment {self.id} of version {self.version}{origin}: {self.status}",
             attributes={
+                "deployment_id": self.id,
                 "version": self.version,
                 "previous_version": self.previous_version,
                 "status": self.status,
                 "finished_at": self.finished_at.isoformat() if self.finished_at else None,
+                # Shared keys that let correlation detect conflicting states (A-5).
+                "entity": f"deployment:{self.id}",
+                "entity_state": self.status,
             },
         )
 

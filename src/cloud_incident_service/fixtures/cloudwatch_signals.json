@@ -1,5 +1,8 @@
 {
   "data_as_of": "2026-10-19T23:59:00Z",
+  "data_as_of_overrides": {
+    "billing-api/production": "2026-10-19T10:20:00Z"
+  },
   "unavailable": [],
   "alarms": [
     {
@@ -51,6 +54,36 @@
       "previous_state": "OK",
       "new_state": "ALARM",
       "reason": "Threshold crossed: p99 latency above 800 ms"
+    },
+    {
+      "id": "a-cart-001",
+      "service": "cart-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T12:10:00Z",
+      "alarm_name": "cart-api-latency-p99",
+      "previous_state": "OK",
+      "new_state": "ALARM",
+      "reason": "Threshold crossed: p99 latency above 1200 ms"
+    },
+    {
+      "id": "a-bill-001",
+      "service": "billing-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T10:12:00Z",
+      "alarm_name": "billing-api-5xx-rate",
+      "previous_state": "OK",
+      "new_state": "ALARM",
+      "reason": "Threshold crossed: 3 datapoints above 1 percent"
+    },
+    {
+      "id": "a-auth-001",
+      "service": "auth-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T15:05:00Z",
+      "alarm_name": "auth-api-5xx-rate",
+      "previous_state": "OK",
+      "new_state": "ALARM",
+      "reason": "Threshold crossed: 3 datapoints above 2 percent"
     }
   ],
   "metrics": [
@@ -147,6 +180,32 @@
       "timestamp": "2026-10-19T14:01:30Z",
       "level": "ERROR",
       "message": "Could not connect to checkout-db on port 5432: connection timed out"
+    },
+    {
+      "id": "l-cart-001",
+      "service": "cart-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T12:11:00Z",
+      "level": "ERROR",
+      "message": "Upstream pricing-service returned HTTP 503"
+    },
+    {
+      "id": "l-bill-001",
+      "service": "billing-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T10:13:00Z",
+      "level": "ERROR",
+      "message": "Invoice renderer timed out after 5000 ms"
+    },
+    {
+      "id": "l-auth-001",
+      "service": "auth-api",
+      "environment": "production",
+      "timestamp": "2026-10-19T15:06:00Z",
+      "level": "ERROR",
+      "message": "Deployment d-0610 failed health checks and was rolled back",
+      "deployment_id": "d-0610",
+      "deployment_status": "rolled_back"
     }
   ]
 }

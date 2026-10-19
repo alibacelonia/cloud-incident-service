@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from pydantic import AwareDatetime, StringConstraints
+from pydantic import AwareDatetime, StringConstraints, model_validator
 
 from cloud_incident_service.domain import Evidence
 from cloud_incident_service.tools.base import ToolOutput
-from cloud_incident_service.tools.fixture_tool import FixtureRecord, FixtureTool
+from cloud_incident_service.tools.fixture_tool import FixtureRecord, FixtureTool, RecordId
 
 ShortText = Annotated[str, StringConstraints(min_length=1, max_length=300)]
 Label = Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9._/:-]{1,128}$")]
@@ -65,12 +65,31 @@ class MetricDatapoint(FixtureRecord):
         )
 
 
+DeploymentStatus = Literal["succeeded", "failed", "rolled_back", "in_progress"]
+
+
 class LogEvent(FixtureRecord):
     timestamp: AwareDatetime
     level: Literal["ERROR", "WARN", "INFO"]
     message: ShortText
+    # Optional structured fields emitted by deployment tooling.
+    deployment_id: RecordId | None = None
+    deployment_status: DeploymentStatus | None = None
+
+    @model_validator(mode="after")
+    def _deployment_fields_together(self) -> LogEvent:
+        if (self.deployment_id is None) != (self.deployment_status is None):
+            raise ValueError("deployment_id and deployment_status must be set together")
+        return self
 
     def to_evidence(self) -> Evidence:
+        attributes: dict[str, str | None] = {"level": self.level}
+        if self.deployment_id is not None:
+            attributes |= {
+                "deployment_id": self.deployment_id,
+                "entity": f"deployment:{self.deployment_id}",
+                "entity_state": self.deployment_status,
+            }
         return Evidence(
             source_id=f"log:{self.service}:{self.id}",
             tool=TOOL_NAME,
@@ -79,7 +98,7 @@ class LogEvent(FixtureRecord):
             timestamp=self.timestamp,
             kind="log_event",
             summary=f"{self.level} log: {self.message}",
-            attributes={"level": self.level},
+            attributes=attributes,
         )
 
 

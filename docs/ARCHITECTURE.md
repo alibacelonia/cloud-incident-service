@@ -23,8 +23,12 @@
   assigns the investigation ID and timestamp, assembles the validated report, and rejects evidence
   that no tool returned in that session (FR-5 rule 1, ADR-009).
 - `orchestration/` defines the `Orchestrator` protocol and a `DeterministicOrchestrator` that
-  queries every registered tool once and reports evidence, timeline, data-source status, and
-  uncertainties for empty or failed sources. Correlated findings arrive in F-06.
+  queries every registered tool once and passes the results to `findings.build_findings`, which
+  produces facts, hypotheses, uncertainties, next steps, and remediation proposals using the
+  rules in ADR-010.
+- `correlation/` holds pure rules over evidence: abnormal signals and onset, changes correlated
+  within 30 minutes before onset (A-3), stale sources (A-4), and contradictions between evidence
+  that reports different states for the same `entity` attribute (A-5).
 - `tools/` holds the read-only `ToolRegistry` and `ToolSession` and four fixture-backed tools:
   `cloudwatch_signals`, `deployment_history`, `infrastructure_changes`, and `runbook_search` (D-8).
   Change tools apply the 60-minute look-back (A-3). `runbooks.py` parses Markdown runbooks into
@@ -38,7 +42,7 @@
   `ProviderInvocationError`.
 - `prompts/` stores prompt text outside Python code.
 
-Known gaps against the target: no correlation, trace, or evaluation harness. The provider protocol supports text only, not tool use.
+Known gaps against the target: no trace or evaluation harness. The provider protocol supports text only, not tool use.
 
 ## Target MVP architecture
 
