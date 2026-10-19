@@ -22,6 +22,19 @@ curl -X POST http://localhost:8000/v1/generate \
   -d '{"input":"Summarize the local starter"}'
 ```
 
+Start an incident investigation:
+
+```bash
+curl -X POST http://localhost:8000/v1/investigations \
+  -H 'content-type: application/json' \
+  -d '{"service":"payments-api","environment":"production","symptoms":"Elevated 5xx errors after 10:05 UTC","time_range":{"start":"2026-10-19T10:00:00Z","end":"2026-10-19T11:00:00Z"}}'
+```
+
+The response is a schema-validated incident report. Until evidence sources are added, every report
+has `"status": "partial"` and an uncertainty stating that no sources were queried. Invalid input
+(unknown environment, timestamps without a UTC offset, `end` not after `start`, a window over 24
+hours, or unknown fields) returns HTTP 422.
+
 The default `mock` provider is deterministic and needs no API key. Prompt templates live under `src/cloud_incident_service/prompts/`. Selected external providers are initialized lazily and their credentials stay in environment variables.
 
 ## Configuration

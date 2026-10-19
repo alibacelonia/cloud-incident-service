@@ -16,6 +16,13 @@
 - `main.py` defines HTTP boundaries, dependency injection, startup validation (lifespan), the
   `/health` readiness check, and error mapping.
 - `config.py` validates settings from the environment and raises `ConfigurationError` (ADR-008).
+- `domain/` holds the incident request and report models. `Findings` is what an orchestrator
+  concludes; `IncidentReport` extends it with identity, request, and provenance, and adds the
+  request-scoped checks. Cross-reference rules (FR-5) are model validators.
+- `application/` contains `InvestigationService`, which assigns the investigation ID and timestamp
+  and assembles the validated report.
+- `orchestration/` defines the `Orchestrator` protocol and a `DeterministicOrchestrator` that has no
+  evidence sources yet and returns a `partial` report.
 - `providers/` defines the provider protocol (`AIProvider.generate(prompt) -> str`), an offline mock,
   and the Bedrock adapter in `providers/bedrock.py`, which translates SDK failures into
   `ProviderInvocationError`.
@@ -23,8 +30,7 @@
 - An in-memory retrieval seam provides deterministic local RAG behaviour and can later be replaced
   behind the same boundary.
 
-Known gaps against the target: no tool registry, orchestration, domain models, trace, or evaluation
-harness. The provider protocol supports text only, not tool use.
+Known gaps against the target: no tool registry, correlation, trace, or evaluation harness. The provider protocol supports text only, not tool use.
 
 ## Target MVP architecture
 
@@ -83,7 +89,9 @@ tests/
 - `ToolRegistry`: `register(tool)` rejects non-read-only tools; `invoke(name, raw_input)` validates
   input, refuses unknown names, enforces a per-tool timeout, and converts exceptions or invalid
   output into `unavailable` or `malformed` results.
-- `Orchestrator`: `async investigate(request, registry, recorder) -> IncidentReport`.
+- `Orchestrator`: `provenance` plus `async investigate(request) -> Findings`. The registry and
+  trace recorder are constructor dependencies; `InvestigationService` turns findings into an
+  `IncidentReport`.
 - `ModelClient`: `async converse(system, messages, tools, limits) -> ModelTurn`, where `ModelTurn`
   is either text or tool-use requests plus token usage. The existing `AIProvider` remains only while
   the starter endpoints exist [D-4].

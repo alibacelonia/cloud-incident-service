@@ -11,7 +11,10 @@ from fastapi import Depends, FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
+from cloud_incident_service.application import InvestigationService
 from cloud_incident_service.config import ConfigurationError, Settings
+from cloud_incident_service.domain import IncidentReport, IncidentRequest
+from cloud_incident_service.orchestration import DeterministicOrchestrator
 from cloud_incident_service.providers import AIProvider, ProviderInvocationError, create_provider
 
 logger = logging.getLogger(__name__)
@@ -103,6 +106,18 @@ async def generate(
 ) -> GenerateResponse:
     rendered = f"{system_prompt()}\n\nUser input:\n{request.input}"
     return GenerateResponse(output=await provider.generate(rendered))
+
+
+def get_investigation_service() -> InvestigationService:
+    return InvestigationService(DeterministicOrchestrator())
+
+
+@app.post("/v1/investigations", response_model=IncidentReport)
+async def create_investigation(
+    request: IncidentRequest,
+    service: InvestigationService = Depends(get_investigation_service),
+) -> IncidentReport:
+    return await service.investigate(request)
 
 
 class DocumentRequest(BaseModel):
