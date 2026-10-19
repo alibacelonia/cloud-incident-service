@@ -1,0 +1,17 @@
+# This file is managed by Copier and records template provenance.
+_src_path: /Volumes/Samsung T7/Development/ai-project-factory/templates/ai-service
+ai_integration: true
+aws_bedrock: true
+background_jobs: false
+description: AI-assisted AWS incident investigation service
+document_processing: true
+llm_provider: true
+openai_api: false
+package_name: cloud_incident_service
+project_name: cloud-incident-service
+project_slug: cloud-incident-service
+project_type: ai-service
+rag: true
+template_version: 0.2.0
+vector_database: true
+

@@ -1,0 +1,36 @@
+project:
+  name: cloud-incident-service
+  description: "AI-assisted AWS incident investigation service"
+  type: ai-service
+  stage: mvp
+  template_version: "0.2.0"
+
+stack:
+  language: python
+  backend: fastapi
+  frontend: null
+  database: null
+
+features:
+  ai_integration: true
+  background_jobs: false
+  llm_provider: true
+  aws_bedrock: true
+  openai_api: false
+  rag: true
+  vector_database: true
+  document_processing: true
+
+deployment:
+  provider: local
+  docker: false
+
+development:
+  testing: true
+  linting: true
+  ci_cd: true
+
+constraints:
+  prioritize_low_cost: true
+  offline_development: true
+
