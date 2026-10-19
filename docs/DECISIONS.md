@@ -45,7 +45,7 @@
 ## ADR-007: In-memory lexical runbook retrieval satisfies `rag` and `vector_database` for the MVP
 
 - **Status:** accepted (2026-10-19)
-- **Context:** `project.yaml` enables `rag`, `vector_database`, and `document_processing`, while the handoff excludes production vector infrastructure and the constraints favour low cost and offline work.
+- **Context:** `project.yaml` enables `rag`, `vector_database`, and `document_processing`, while the initial project brief excluded production vector infrastructure and the constraints favour low cost and offline work.
 - **Decision:** Runbooks are synthetic Markdown fixtures, split into sections at load time (document processing) and searched by a deterministic lexical `RunbookRetriever` behind a protocol. No embedding model or vector database is used in the MVP.
 - **Consequences:** Retrieval is deterministic and free, but has weaker recall than semantic search. A vector store can replace the retriever behind the same protocol later. The owner confirmed this interpretation of `vector_database: true` (D-1).
 

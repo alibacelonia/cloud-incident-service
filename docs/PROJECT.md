@@ -2,8 +2,8 @@
 
 > **Status:** MVP requirements v1, **approved by the owner on 2026-10-19**.
 > Items tagged **[A-n]** follow a confirmed default and items tagged **[D-n]** follow a recorded
-> decision; both are listed at the end of this document. `docs/HANDOFF.md` is
-> context only; this document and `project.yaml` are authoritative.
+> decision; both are listed at the end of this document. This document and `project.yaml` are
+> the authoritative requirements.
 >
 > **Implementation:** MVP complete (2026-10-19); all features F-01 to F-11 are delivered and
 > verified by the owner; see `docs/TASKS.md`. Live

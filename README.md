@@ -199,6 +199,10 @@ repository skills (`.agents/skills/`) cover requirements analysis, feature devel
 and code review; `software-architect` and `security-reviewer` agents are available for
 architecture and security analysis.
 
+## License
+
+[MIT](LICENSE)
+
 ## Template updates
 
 Keep `.copier-answers.yml`. Back up or commit application work before applying a versioned template

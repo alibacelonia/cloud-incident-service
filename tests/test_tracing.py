@@ -35,7 +35,7 @@ FIXED_ID = UUID("00000000-0000-4000-8000-000000000007")
 FIXED_TIME = datetime(2026, 10, 19, 11, 5, tzinfo=UTC)
 CANARY_KEY = "AKIAEXAMPLECANARY000"
 CANARY_ACCOUNT = "210987654321"
-CANARY_EMAIL = "oncall@corp-canary.io"
+CANARY_EMAIL = "oncall@canary-team.example"
 CANARY_TOKEN = "Bearer canary.token.value-12345"
 CANARY_ENV_SECRET = "env-secret-canary-value"
 
