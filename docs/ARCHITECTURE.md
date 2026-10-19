@@ -47,7 +47,13 @@
   `ProviderInvocationError`.
 - `prompts/` stores prompt text outside Python code.
 
-Known gaps against the target: no evaluation harness. The provider protocol supports text only, not tool use.
+- `evaluation/` runs the scenarios in `fixtures/evaluation_scenarios.json` through the real
+  `InvestigationService` and scores each report and trace on five checks: schema, citations,
+  hypothesis, sources, and safety (ADR-012). `python -m cloud_incident_service.evaluation` prints the
+  results and exits non-zero below `--min-pass-rate`.
+
+Known gaps against the target: the model-driven orchestrator (F-09). The provider protocol supports
+text only, not tool use.
 
 ## Target MVP architecture
 
@@ -68,7 +74,7 @@ FastAPI boundary (main.py / api)
             -> Correlator (normalize, filter, order, correlate, flag stale/contradictions)
         -> IncidentReport (validated domain model)
         -> TraceRecorder -> Redactor -> TraceSink (JSON file)  [D-3]
-Evaluation runner (tests/evaluation) -> InvestigationService with scenario fixtures
+Evaluation runner (evaluation/) -> InvestigationService with scenario fixtures
 ```
 
 ### Proposed module layout
@@ -86,8 +92,9 @@ src/cloud_incident_service/
   tracing/                # TraceRecorder, Redactor, TraceSink implementations
   prompts/                # Versioned prompt templates
   fixtures/               # Synthetic scenario data and runbooks (package data)
+  evaluation/             # Scenario runner and CLI (python -m cloud_incident_service.evaluation)
 tests/
-  unit/ integration/ evaluation/ live/
+  test_*.py (flat; live tests will be marked `live`)
 ```
 
 ### Dependency rules
@@ -162,7 +169,8 @@ tests/
 - **Unit:** domain validators, correlation rules, registry behaviour, redaction.
 - **Integration:** API tests through `TestClient` with dependency overrides, plus the deterministic
   orchestrator over fixtures.
-- **Evaluation:** scenario runner. The deterministic path must pass 100% of scenarios.
+- **Evaluation:** `evaluation/` scenario runner, exercised by `tests/test_evaluation.py` and run in
+  CI. The deterministic path must pass 100% of scenarios.
 - **Live:** `@pytest.mark.live`, deselected by default and skipped with a reason when not opted in
   or configured.
 - A socket-blocking guard in `conftest.py` enforces offline default tests.

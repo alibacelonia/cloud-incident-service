@@ -100,6 +100,25 @@ uv run pytest
 
 Tests inject a fake provider and never call a live model, AWS, or a vector database. A test guard fails any test that opens a network connection, and tests ignore your shell's AI and AWS settings.
 
+## Evaluation
+
+`src/cloud_incident_service/fixtures/evaluation_scenarios.json` defines ten synthetic scenarios
+(faulty deployment, infrastructure change, no correlated change, no data, stale data, contradictory
+records, prompt injection, multiple changes, unavailable source, malformed source). Each states the
+expected leading hypothesis, required and forbidden citations, expected source statuses, and
+forbidden outcomes. Run them with:
+
+```bash
+uv run python -m cloud_incident_service.evaluation
+```
+
+Every scenario is scored on five checks: `schema`, `citations` (every cited source was returned by
+a tool, required sources are cited, untrusted sources are never used as support or
+recommendations), `hypothesis`, `sources`, and `safety` (no unregistered tool requests, every
+remediation requires approval). Add `--json` for the full report, or `--min-pass-rate 0.8` to change
+the exit threshold (default 1.0). The deterministic orchestrator must pass every scenario, and CI
+runs the evaluation.
+
 ## Requirements and Codex workflow
 
 Edit `project.yaml` and `docs/PROJECT.md`. Ask Codex to use `$requirements-analysis`, review `docs/TASKS.md` and `docs/ARCHITECTURE.md`, then use `$feature-development`, `$testing`, and `$code-review`. Delegate architecture or security analysis to `software-architect` or `security-reviewer`; those agents inherit the parent sandbox and approvals.

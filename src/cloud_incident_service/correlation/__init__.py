@@ -8,6 +8,7 @@ from cloud_incident_service.correlation.rules import (
     correlated_changes,
     find_contradictions,
     is_abnormal_signal,
+    looks_like_instructions,
     signal_onset,
     stale_tools,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "correlated_changes",
     "find_contradictions",
     "is_abnormal_signal",
+    "looks_like_instructions",
     "signal_onset",
     "stale_tools",
 ]

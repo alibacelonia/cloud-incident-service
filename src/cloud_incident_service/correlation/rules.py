@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from collections.abc import Iterable
 from dataclasses import dataclass
@@ -12,6 +13,23 @@ CORRELATION_WINDOW = timedelta(minutes=30)
 CHANGE_KINDS = frozenset({"deployment", "infrastructure_change"})
 ENTITY = "entity"
 ENTITY_STATE = "entity_state"
+
+
+# Phrases typical of prompt injection. Matching evidence is still reported as data, but it is
+# flagged and never recommended to the responder (SEC-2).
+_INSTRUCTION_PATTERNS = re.compile(
+    r"(?i)\b(?:"
+    r"ignore (?:all |any )?(?:previous|prior|above|earlier) instructions"
+    r"|disregard (?:all |any )?(?:previous|prior|above|earlier)"
+    r"|you are now\b"
+    r"|(?:system|developer) prompt"
+    r"|call the [a-z0-9_]+ tool"
+    r")"
+)
+
+
+def looks_like_instructions(item: Evidence) -> bool:
+    return bool(_INSTRUCTION_PATTERNS.search(item.summary))
 
 
 def _ordered(evidence: Iterable[Evidence]) -> list[Evidence]:

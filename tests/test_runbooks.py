@@ -221,6 +221,7 @@ def test_injected_instructions_in_runbooks_are_returned_as_data_only() -> None:
     # Nothing acted on the text: only the four registered tools ran, once each.
     assert [source.tool for source in report.data_sources] == registry.tool_names
     assert report.hypotheses == []
-    assert report.facts == []
     assert report.remediation_proposals == []
-    assert report.timeline == []
+    # The only event is the (also injected) error log; facts restate it as data.
+    assert report.timeline == ["log:notify-api:l-ntf-001"]
+    assert all(fact.evidence_ids == ["log:notify-api:l-ntf-001"] for fact in report.facts)

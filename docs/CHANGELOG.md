@@ -19,3 +19,5 @@ All notable project changes are recorded here.
 - Add synthetic scenarios for multiple correlated changes, signals without a change, stale data, and contradictory records.
 - Record a secret-free trace for every investigation and write it to `TRACE_DIR/<investigation_id>.json` when `TRACE_DIR` is set. `TRACE_DIR` is validated at startup and by `/health`.
 - Redact secrets in tool output and reported symptoms before they reach reports or traces.
+- Add the evaluation harness: ten synthetic scenarios scored on schema, citations, hypothesis, sources, and safety; `python -m cloud_incident_service.evaluation` runs them and CI requires a 100% pass rate.
+- Flag evidence that resembles injected instructions and never recommend it; add a prompt-injection log line to the `notify-api` fixtures.

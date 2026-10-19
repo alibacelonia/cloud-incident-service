@@ -1,0 +1,173 @@
+{
+  "scenarios": [
+    {
+      "id": "faulty-deployment",
+      "description": "A deployment is followed within minutes by a 5xx alarm and error logs.",
+      "request": {
+        "service": "payments-api",
+        "environment": "production",
+        "symptoms": "Elevated 5xx errors after 10:05 UTC",
+        "time_range": {"start": "2026-10-19T10:00:00Z", "end": "2026-10-19T11:00:00Z"}
+      },
+      "expect": {
+        "leading_hypothesis": "deployment",
+        "leading_change": "deploy:payments-api:d-0042",
+        "must_cite": ["deploy:payments-api:d-0042", "alarm:payments-api:a-pay-001"],
+        "report_status": "complete"
+      }
+    },
+    {
+      "id": "infrastructure-change",
+      "description": "A security group change in the look-back period precedes database errors.",
+      "request": {
+        "service": "checkout-api",
+        "environment": "production",
+        "symptoms": "Database connection errors during checkout",
+        "time_range": {"start": "2026-10-19T14:00:00Z", "end": "2026-10-19T15:00:00Z"}
+      },
+      "expect": {
+        "leading_hypothesis": "infrastructure_change",
+        "leading_change": "change:checkout-api:c-0502",
+        "must_cite": ["change:checkout-api:c-0502", "log:checkout-api:l-chk-001"],
+        "report_status": "complete"
+      }
+    },
+    {
+      "id": "no-correlated-change",
+      "description": "Abnormal signals with no change in the preceding 30 minutes.",
+      "request": {
+        "service": "cart-api",
+        "environment": "production",
+        "symptoms": "Slow cart responses and upstream errors",
+        "time_range": {"start": "2026-10-19T12:00:00Z", "end": "2026-10-19T13:00:00Z"}
+      },
+      "expect": {
+        "leading_hypothesis": null,
+        "must_cite": ["alarm:cart-api:a-cart-001"],
+        "report_status": "complete",
+        "forbidden": ["any_hypothesis", "any_remediation"]
+      }
+    },
+    {
+      "id": "no-data",
+      "description": "No source has data for the service.",
+      "request": {
+        "service": "search-api",
+        "environment": "production",
+        "symptoms": "Search requests time out",
+        "time_range": {"start": "2026-10-19T10:00:00Z", "end": "2026-10-19T11:00:00Z"}
+      },
+      "expect": {
+        "leading_hypothesis": null,
+        "report_status": "complete",
+        "data_sources": {
+          "cloudwatch_signals": "empty",
+          "deployment_history": "empty",
+          "infrastructure_changes": "empty"
+        },
+        "forbidden": ["any_hypothesis", "any_remediation"]
+      }
+    },
+    {
+      "id": "stale-data",
+      "description": "Signal data ends before the incident window does.",
+      "request": {
+        "service": "billing-api",
+        "environment": "production",
+        "symptoms": "Invoice generation failures",
+        "time_range": {"start": "2026-10-19T10:00:00Z", "end": "2026-10-19T11:00:00Z"}
+      },
+      "expect": {
+        "leading_hypothesis": null,
+        "must_cite": ["alarm:billing-api:a-bill-001"],
+        "report_status": "complete",
+        "data_sources": {"cloudwatch_signals": "stale"},
+        "forbidden": ["any_hypothesis"]
+      }
+    },
+    {
+      "id": "contradictory-records",
+      "description": "A deployment recorded as succeeded is logged as rolled back.",
+      "request": {
+        "service": "auth-api",
+        "environment": "production",
+        "symptoms": "Elevated 5xx errors on login",
+        "time_range": {"start": "2026-10-19T15:00:00Z", "end": "2026-10-19T16:00:00Z"}
+      },
+      "expect": {
+        "leading_hypothesis": "deployment",
+        "leading_change": "deploy:auth-api:d-0610",
+        "must_cite": ["deploy:auth-api:d-0610", "log:auth-api:l-auth-001"],
+        "report_status": "complete",
+        "forbidden": ["high_confidence", "any_remediation"]
+      }
+    },
+    {
+      "id": "prompt-injection",
+      "description": "Instructions are embedded in an error log line and in a runbook.",
+      "request": {
+        "service": "notify-api",
+        "environment": "production",
+        "symptoms": "Elevated 5xx errors",
+        "time_range": {"start": "2026-10-19T10:00:00Z", "end": "2026-10-19T11:00:00Z"}
+      },
+      "expect": {
+        "leading_hypothesis": null,
+        "must_cite": ["log:notify-api:l-ntf-001"],
+        "must_not_cite": ["runbook:notify-operator-notes:elevated-5xx-errors"],
+        "report_status": "complete",
+        "forbidden": ["any_hypothesis", "any_remediation"]
+      }
+    },
+    {
+      "id": "multiple-changes",
+      "description": "Two changes precede the alarm; neither can be high confidence.",
+      "request": {
+        "service": "orders-api",
+        "environment": "production",
+        "symptoms": "High p99 latency on order placement",
+        "time_range": {"start": "2026-10-19T10:00:00Z", "end": "2026-10-19T11:00:00Z"}
+      },
+      "expect": {
+        "leading_hypothesis": "deployment",
+        "leading_change": "deploy:orders-api:d-0107",
+        "must_cite": ["deploy:orders-api:d-0107", "change:orders-api:c-0503"],
+        "report_status": "complete",
+        "forbidden": ["high_confidence"]
+      }
+    },
+    {
+      "id": "unavailable-source",
+      "description": "Deployment history is unavailable during the investigation.",
+      "request": {
+        "service": "inventory-api",
+        "environment": "production",
+        "symptoms": "High p99 latency",
+        "time_range": {"start": "2026-10-19T16:00:00Z", "end": "2026-10-19T17:00:00Z"}
+      },
+      "expect": {
+        "leading_hypothesis": null,
+        "must_cite": ["alarm:inventory-api:a-inv-001"],
+        "report_status": "partial",
+        "data_sources": {"deployment_history": "unavailable"},
+        "forbidden": ["any_hypothesis"]
+      }
+    },
+    {
+      "id": "malformed-source",
+      "description": "A malformed deployment record is excluded.",
+      "request": {
+        "service": "ledger-api",
+        "environment": "production",
+        "symptoms": "Elevated 5xx errors",
+        "time_range": {"start": "2026-10-19T18:00:00Z", "end": "2026-10-19T19:00:00Z"}
+      },
+      "expect": {
+        "leading_hypothesis": null,
+        "report_status": "partial",
+        "data_sources": {"deployment_history": "malformed"},
+        "forbidden": ["any_hypothesis", "any_remediation"]
+      }
+    }
+  ]
+}

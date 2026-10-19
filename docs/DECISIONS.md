@@ -82,3 +82,15 @@
 - **Context:** ADR-006 planned redaction of exported traces only. SEC-4 also forbids secrets in reports, and tool output and free-text symptoms are where secrets would enter. A UUID whose last group is all digits also matched the naive 12-digit account-ID pattern.
 - **Decision:** Redaction is applied where untrusted text enters: `ToolSession` redacts every evidence summary and attribute before it is recorded or returned, and `InvestigationService` redacts the symptoms (capped at the 2,000-character limit). Exported traces are redacted again as a whole. The account-ID pattern requires that the 12 digits are not adjacent to word characters or hyphens. Refused tool calls record argument names only. A trace that cannot be written is logged by investigation ID and error type, and the investigation still returns its report.
 - **Consequences:** Reports, traces, and future model prompts share one redaction point per input. Redaction is pattern-based and can miss novel secret formats or over-redact unusual identifiers. Trace files can be missing for an investigation when the disk fails, which is preferred over failing the user's request.
+
+## ADR-012: Scenario evaluation harness and instruction-like evidence
+
+- **Status:** accepted (2026-10-19; implements FR-8, SEC-2, AC-10)
+- **Context:** The deterministic orchestrator needs a reproducible baseline, and the model-driven orchestrator (F-09) must be scored the same way. The prompt-injection scenario showed that the runbook next step could point responders at a runbook section containing injected instructions.
+- **Decision:**
+  - Scenarios are data (`fixtures/evaluation_scenarios.json`, covered by the fixture hygiene test) with typed expectations: leading hypothesis category and change, required citations, sources that must not be used as support or recommendations, report and source statuses, and forbidden outcomes (`any_hypothesis`, `any_remediation`, `high_confidence`).
+  - The runner lives in the package (`evaluation/`) so the same code scores deterministic, scripted, and live orchestrators. It uses the real `InvestigationService` with an in-memory trace and scores five checks; investigation failures are scored, not raised.
+  - Citation validity is checked against the trace (source IDs returned by tool calls), independently of the service's own provenance check.
+  - Evidence whose text resembles instructions (for example "ignore previous instructions", "call the … tool") is flagged with an uncertainty and excluded from recommended runbook steps. It stays in the report as data.
+  - CI runs `python -m cloud_incident_service.evaluation`, which exits non-zero below `--min-pass-rate` (default 1.0).
+- **Consequences:** Behaviour changes that alter findings show up as failing scenarios. The instruction detector is pattern-based and is a secondary control; the primary controls remain the read-only registry, delimited prompts (F-09), and report validation.

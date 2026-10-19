@@ -153,19 +153,36 @@ def test_unavailable_change_source_is_reported_in_correlation_gap() -> None:
 
 
 def test_quiet_service_reports_no_abnormal_signals() -> None:
-    report = investigate("notify-api")
+    service_ = InvestigationService(DeterministicOrchestrator(), build_default_registry())
+    report = asyncio.run(
+        service_.investigate(request_for("search-api", symptoms="Database connection errors"))
+    )
 
+    # Only runbook sections matched; with no events there is no signal gap to report.
+    assert report.evidence and report.timeline == []
     assert report.facts == []
     assert report.next_steps == []  # no runbook step without abnormal signals
-    # Only a runbook section matched; with no events there is no signal gap to report.
-    assert report.timeline == []
-    assert "No data from cloudwatch_signals for this service and time range." in [
-        item.description for item in report.uncertainties
-    ]
     assert (
         report.summary
-        == "No abnormal signals were found for notify-api in production in the time range."
+        == "No abnormal signals were found for search-api in production in the time range."
     )
+
+
+def test_instruction_like_evidence_is_flagged_and_never_recommended() -> None:
+    report = investigate("notify-api")
+
+    flagged = {
+        item.evidence_ids[0]
+        for item in report.uncertainties
+        if "resembles instructions" in item.description
+    }
+    assert flagged == {
+        "log:notify-api:l-ntf-001",
+        "runbook:notify-operator-notes:elevated-5xx-errors",
+    }
+    recommended = {sid for step in report.next_steps for sid in step.evidence_ids}
+    assert "runbook:notify-operator-notes:elevated-5xx-errors" not in recommended
+    assert report.hypotheses == [] and report.remediation_proposals == []
 
 
 @pytest.mark.parametrize("service", sorted(SCENARIOS))

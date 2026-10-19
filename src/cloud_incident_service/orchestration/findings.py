@@ -18,6 +18,7 @@ from cloud_incident_service.correlation import (
     abnormal_signals,
     correlated_changes,
     find_contradictions,
+    looks_like_instructions,
     signal_onset,
     stale_tools,
 )
@@ -69,6 +70,7 @@ def build_findings(request: IncidentRequest, results: list[ToolResult]) -> Findi
         uncertainties=[
             *_source_uncertainties(results, stale),
             *analysis.uncertainties(),
+            *_instruction_uncertainties(evidence),
         ],
         next_steps=[*analysis.next_steps(), *_runbook_step(evidence, onset)],
         remediation_proposals=analysis.remediation,
@@ -358,8 +360,27 @@ def _source_uncertainties(results: list[ToolResult], stale: set[str]) -> list[Un
     return items
 
 
+def _instruction_uncertainties(evidence: list[Evidence]) -> list[Uncertainty]:
+    return [
+        Uncertainty(
+            description=(
+                f"{item.source_id} contains text that resembles instructions; it was treated as "
+                "data and not followed."
+            ),
+            tool=item.tool,
+            evidence_ids=[item.source_id],
+        )
+        for item in evidence
+        if looks_like_instructions(item)
+    ]
+
+
 def _runbook_step(evidence: list[Evidence], onset: Evidence | None) -> list[NextStep]:
-    sections = [item for item in evidence if item.kind == RUNBOOK_SECTION]
+    sections = [
+        item
+        for item in evidence
+        if item.kind == RUNBOOK_SECTION and not looks_like_instructions(item)
+    ]
     if onset is None or not sections:
         return []
     top = min(sections, key=lambda item: (item.attributes.get("rank", 0), item.source_id))
