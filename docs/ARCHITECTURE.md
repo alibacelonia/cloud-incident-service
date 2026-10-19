@@ -37,12 +37,17 @@
   to service-specific runbooks, then source ID. The deterministic orchestrator searches runbooks with
   the reported symptoms and keeps runbook sections out of the event timeline.
 - `fixtures/` contains the synthetic JSON data, checked by a hygiene test (SEC-5).
+- `tracing/` holds the `InvestigationTrace` model, a `TraceRecorder` that observes the tool session
+  and records validation outcomes, and `FileTraceSink` / `InMemoryTraceSink`. `TRACE_DIR` enables
+  file export (D-3); it is validated at startup and by `/health` (NFR-8).
+- `redaction.py` redacts secrets in tool output (inside `ToolSession`), in reported symptoms (in
+  `InvestigationService`), and in exported traces (ADR-011).
 - `providers/` defines the provider protocol (`AIProvider.generate(prompt) -> str`), an offline mock,
   and the Bedrock adapter in `providers/bedrock.py`, which translates SDK failures into
   `ProviderInvocationError`.
 - `prompts/` stores prompt text outside Python code.
 
-Known gaps against the target: no trace or evaluation harness. The provider protocol supports text only, not tool use.
+Known gaps against the target: no evaluation harness. The provider protocol supports text only, not tool use.
 
 ## Target MVP architecture
 

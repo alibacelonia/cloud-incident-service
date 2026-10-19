@@ -17,3 +17,5 @@ All notable project changes are recorded here.
 - Add `runbook_search`: synthetic Markdown runbooks are split into sections with stable source IDs and ranked deterministically against the reported symptoms. Runbook text, including injected instructions, is returned as data only.
 - Correlate evidence into facts, hypotheses with confidence and rationale, next steps, and approval-gated remediation proposals. Stale sources are flagged, contradictory records lower confidence and block remediation, and failed sources make reports `partial`.
 - Add synthetic scenarios for multiple correlated changes, signals without a change, stale data, and contradictory records.
+- Record a secret-free trace for every investigation and write it to `TRACE_DIR/<investigation_id>.json` when `TRACE_DIR` is set. `TRACE_DIR` is validated at startup and by `/health`.
+- Redact secrets in tool output and reported symptoms before they reach reports or traces.

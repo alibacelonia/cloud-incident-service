@@ -14,6 +14,7 @@ from pydantic import (
 )
 
 MAX_TIME_WINDOW = timedelta(hours=24)
+MAX_SYMPTOMS_LENGTH = 2_000
 
 Environment = Literal["production", "staging", "development"]
 ServiceName = Annotated[
@@ -59,6 +60,6 @@ class IncidentRequest(BaseModel):
     service: ServiceName
     environment: Environment
     symptoms: Annotated[
-        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=2_000)
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=MAX_SYMPTOMS_LENGTH)
     ]
     time_range: TimeRange = Field(description="Approximate incident window, at most 24 hours")

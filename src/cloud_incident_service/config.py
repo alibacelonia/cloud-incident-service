@@ -2,15 +2,17 @@ from __future__ import annotations
 
 import os
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
 
 # Maps settings fields to the environment variables they are read from.
 ENVIRONMENT_VARIABLES: dict[str, str] = {
     "provider": "AI_PROVIDER",
     "model": "AI_MODEL",
     "aws_region": "AWS_REGION",
+    "trace_dir": "TRACE_DIR",
 }
 
 
@@ -28,6 +30,15 @@ class Settings(BaseModel):
     provider: Literal["mock", "bedrock"] = "mock"
     model: str = Field(default="", max_length=256, pattern=r"^\S*$")
     aws_region: str | None = Field(default=None, pattern=r"^[a-z]{2}(-[a-z]+)+-\d+$")
+    # D-3: traces are written only when a directory is configured.
+    trace_dir: Path | None = None
+
+    @field_validator("trace_dir", mode="before")
+    @classmethod
+    def _check_trace_dir(cls, value: object) -> object:
+        if isinstance(value, str) and ("\x00" in value or len(value) > 1_024):
+            raise ValueError("must be a directory path of at most 1024 characters")
+        return value
 
     @model_validator(mode="after")
     def _require_bedrock_settings(self) -> Settings:
@@ -42,8 +53,9 @@ class Settings(BaseModel):
         provider = env.get("AI_PROVIDER", "mock").strip().lower()
         model = env.get("AI_MODEL", "").strip()
         region = (env.get("AWS_REGION") or env.get("AWS_DEFAULT_REGION") or "").strip() or None
+        trace_dir = env.get("TRACE_DIR", "").strip() or None
         try:
-            return cls(provider=provider, model=model, aws_region=region)
+            return cls(provider=provider, model=model, aws_region=region, trace_dir=trace_dir)
         except ValidationError as exc:
             errors = _safe_messages(exc)
             # Field errors stop the model validator from running; report missing values too.

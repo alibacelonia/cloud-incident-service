@@ -10,7 +10,7 @@ from cloud_incident_service.tools.base import (
 from cloud_incident_service.tools.cloudwatch import CloudWatchSignalsTool
 from cloud_incident_service.tools.deployments import DeploymentHistoryTool
 from cloud_incident_service.tools.infrastructure import InfrastructureChangesTool
-from cloud_incident_service.tools.registry import ToolRegistry, ToolSession
+from cloud_incident_service.tools.registry import ToolCallObserver, ToolRegistry, ToolSession
 from cloud_incident_service.tools.runbook_search import RunbookSearchQuery, RunbookSearchTool
 from cloud_incident_service.tools.runbooks import (
     LexicalRunbookRetriever,
@@ -41,6 +41,7 @@ __all__ = [
     "RunbookSearchQuery",
     "RunbookSearchTool",
     "Tool",
+    "ToolCallObserver",
     "ToolInputError",
     "ToolNotRegisteredError",
     "ToolOutput",

@@ -61,6 +61,7 @@ The default `mock` provider is deterministic and needs no API key. Prompt templa
 | `AI_PROVIDER` | `mock` or `bedrock` | `mock` |
 | `AI_MODEL` | Bedrock model or inference profile ID; required for `bedrock` | empty |
 | `AWS_REGION` | AWS region such as `us-east-1`; required for `bedrock` (`AWS_DEFAULT_REGION` is accepted as a fallback) | unset |
+| `TRACE_DIR` | Directory for investigation trace files, for example `.traces` (git-ignored); created at startup if missing | unset (no trace files) |
 
 Settings are validated at startup. If any value is invalid, uvicorn exits with
 `Application startup failed` and a message naming each offending variable (values are never
@@ -74,6 +75,20 @@ Once investigations call a model, provider failures return a JSON body with a st
 | --- | --- |
 | 503 | `configuration_invalid`, `provider_credentials_unavailable`, `provider_credentials_invalid`, `provider_access_denied`, `provider_throttled`, `provider_unavailable`, `provider_unreachable` |
 | 502 | `provider_request_rejected` (for example an unknown `AI_MODEL`), `provider_response_invalid`, `provider_request_failed` |
+
+## Investigation traces
+
+When `TRACE_DIR` is set, every investigation writes `<investigation_id>.json` to that directory.
+The trace records the normalized request, each tool call (validated arguments, status, returned
+source IDs, duration), refused tool calls (argument names only), report validation outcomes, and
+the final outcome. Traces are redacted for AWS access key IDs, 12-digit account IDs, email
+addresses, bearer tokens, and values under secret-looking keys; the same redaction is applied to
+tool output and to the reported symptoms before they reach a report. If a trace cannot be written,
+the investigation still succeeds and the failure is logged.
+
+```bash
+TRACE_DIR=.traces uv run uvicorn cloud_incident_service.main:app
+```
 
 ## Test and lint
 

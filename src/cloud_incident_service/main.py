@@ -16,6 +16,7 @@ from cloud_incident_service.domain import IncidentReport, IncidentRequest
 from cloud_incident_service.orchestration import DeterministicOrchestrator
 from cloud_incident_service.providers import ProviderInvocationError, create_provider
 from cloud_incident_service.tools import ToolRegistry, build_default_registry
+from cloud_incident_service.tracing import FileTraceSink, check_trace_directory
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,8 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     try:
         settings = Settings.from_environment()
         create_provider(settings)
+        if settings.trace_dir is not None:
+            check_trace_directory(settings.trace_dir, create=True)
     except ConfigurationError as exc:
         logger.error("%s", exc)
         raise
@@ -65,11 +68,13 @@ async def provider_invocation_error(
 
 @app.get("/health", response_model=HealthResponse, responses={503: {"model": HealthResponse}})
 def health(response: Response) -> HealthResponse:
-    # Checks settings and provider construction only; no network call, so credentials
-    # are verified on the first provider invocation.
+    # Checks settings, provider construction, and the trace directory; no network call, so
+    # credentials are verified on the first provider invocation.
     try:
         settings = Settings.from_environment()
         create_provider(settings)
+        if settings.trace_dir is not None:
+            check_trace_directory(settings.trace_dir, create=False)
     except ConfigurationError as exc:
         response.status_code = 503
         return HealthResponse(status="misconfigured", provider=None, errors=exc.errors)
@@ -82,7 +87,9 @@ def default_registry() -> ToolRegistry:
 
 
 def get_investigation_service() -> InvestigationService:
-    return InvestigationService(DeterministicOrchestrator(), default_registry())
+    settings = Settings.from_environment()
+    sink = FileTraceSink(settings.trace_dir) if settings.trace_dir is not None else None
+    return InvestigationService(DeterministicOrchestrator(), default_registry(), trace_sink=sink)
 
 
 @app.post("/v1/investigations", response_model=IncidentReport)

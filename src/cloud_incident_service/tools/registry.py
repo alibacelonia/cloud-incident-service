@@ -2,11 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from collections.abc import Iterable, Mapping
+from typing import Any, Protocol
 
 from pydantic import ValidationError
 
 from cloud_incident_service.domain import Evidence, ToolResult
+from cloud_incident_service.redaction import redact_evidence
 from cloud_incident_service.tools.base import (
     Tool,
     ToolInputError,
@@ -17,6 +20,16 @@ from cloud_incident_service.tools.base import (
 logger = logging.getLogger(__name__)
 
 DEFAULT_TOOL_TIMEOUT_SECONDS = 5.0
+
+
+class ToolCallObserver(Protocol):
+    """Receives every tool call and refusal in a session, for example to build a trace."""
+
+    def record_tool_call(
+        self, arguments: Mapping[str, Any], result: ToolResult, duration_ms: float
+    ) -> None: ...
+
+    def record_tool_refused(self, tool: str, reason: str, argument_names: list[str]) -> None: ...
 
 
 class ToolRegistry:
@@ -44,16 +57,22 @@ class ToolRegistry:
     def tool_names(self) -> list[str]:
         return list(self._tools)
 
-    def session(self) -> ToolSession:
-        return ToolSession(self._tools, self._timeout_seconds)
+    def session(self, observer: ToolCallObserver | None = None) -> ToolSession:
+        return ToolSession(self._tools, self._timeout_seconds, observer)
 
 
 class ToolSession:
     """Tool access for one investigation. Records every result and the evidence returned."""
 
-    def __init__(self, tools: Mapping[str, Tool], timeout_seconds: float) -> None:
+    def __init__(
+        self,
+        tools: Mapping[str, Tool],
+        timeout_seconds: float,
+        observer: ToolCallObserver | None = None,
+    ) -> None:
         self._tools = dict(tools)
         self._timeout_seconds = timeout_seconds
+        self._observer = observer
         self.results: list[ToolResult] = []
         self.returned_evidence: dict[str, Evidence] = {}
 
@@ -65,22 +84,36 @@ class ToolSession:
         tool = self._tools.get(name)
         if tool is None:
             logger.warning("Refused unregistered tool: %s", name[:64])
+            self._refused(name, "not_registered", arguments)
             raise ToolNotRegisteredError(f"tool {name[:64]!r} is not registered")
         try:
             query = tool.input_model.model_validate(arguments)
         except ValidationError as exc:
+            self._refused(name, "invalid_arguments", arguments)
             raise ToolInputError(
                 f"invalid arguments for tool {name!r}: {exc.error_count()} error(s)"
             ) from None
 
+        started = time.perf_counter()
         result = await self._run(tool, query)
+        duration_ms = (time.perf_counter() - started) * 1000
+        # Tool output is untrusted: redact secrets before it reaches reports, traces, or models.
+        result = result.model_copy(
+            update={"evidence": [redact_evidence(item) for item in result.evidence]}
+        )
         logger.info(
             "Tool %s finished: status=%s evidence=%d", name, result.status, len(result.evidence)
         )
         self.results.append(result)
         for item in result.evidence:
             self.returned_evidence[item.source_id] = item
+        if self._observer is not None:
+            self._observer.record_tool_call(query.model_dump(mode="json"), result, duration_ms)
         return result
+
+    def _refused(self, name: str, reason: str, arguments: Mapping[str, object]) -> None:
+        if self._observer is not None:
+            self._observer.record_tool_refused(name, reason, [str(key) for key in arguments])
 
     async def _run(self, tool: Tool, query: object) -> ToolResult:
         try:

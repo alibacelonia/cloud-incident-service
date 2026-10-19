@@ -75,3 +75,10 @@
   - Facts are restricted to direct restatements of evidence (onset, correlated changes, alarms, error-log counts). Remediation is proposed only for medium or high hypotheses, only when a safe reversal is known (a succeeded deployment with a previous version, or an infrastructure change), and always with `requires_human_approval: true`.
   - Runbook sections are recommended only when abnormal signals exist, phrased as "confirm its guidance applies before acting", because runbook text is untrusted.
 - **Consequences:** Findings are explainable and testable but heuristic: causes outside recorded changes (dependencies, traffic) appear only as uncertainties and next steps, and lexical runbook matches can be imprecise. Changing a rule changes evaluation baselines, so rules are covered by scenario tests.
+
+## ADR-011: Redact at ingestion and keep trace export non-fatal
+
+- **Status:** accepted (2026-10-19; refines ADR-006 and implements FR-7, SEC-4)
+- **Context:** ADR-006 planned redaction of exported traces only. SEC-4 also forbids secrets in reports, and tool output and free-text symptoms are where secrets would enter. A UUID whose last group is all digits also matched the naive 12-digit account-ID pattern.
+- **Decision:** Redaction is applied where untrusted text enters: `ToolSession` redacts every evidence summary and attribute before it is recorded or returned, and `InvestigationService` redacts the symptoms (capped at the 2,000-character limit). Exported traces are redacted again as a whole. The account-ID pattern requires that the 12 digits are not adjacent to word characters or hyphens. Refused tool calls record argument names only. A trace that cannot be written is logged by investigation ID and error type, and the investigation still returns its report.
+- **Consequences:** Reports, traces, and future model prompts share one redaction point per input. Redaction is pattern-based and can miss novel secret formats or over-redact unusual identifiers. Trace files can be missing for an investigation when the disk fails, which is preferred over failing the user's request.
