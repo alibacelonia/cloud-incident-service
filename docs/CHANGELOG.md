@@ -3,12 +3,15 @@
 All notable project changes are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [0.1.0] - Unreleased (MVP)
+## [0.1.0] - 2026-10-19
 
 First release of the incident investigation service, built from the `ai-service` profile
 (template version 0.2.0).
 
 ### Added
+
+- CI coverage for Python 3.12, 3.13, and 3.14; a weekly dependency vulnerability audit;
+  Dependabot updates for uv dependencies and GitHub Actions.
 
 - `POST /v1/investigations`: validates an incident request (service, environment, symptoms,
   time range of at most 24 hours) and returns a schema-validated report with evidence, an event

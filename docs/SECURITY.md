@@ -63,7 +63,9 @@ account or resource identifiers.
   injection phrasing and can occasionally over-redact unusual identifiers; they are secondary
   controls behind the read-only registry and report validation.
 - There is no authentication, authorization, rate limiting, or multi-tenancy.
-- Dependency vulnerability scanning is not configured in CI.
+- Dependency auditing runs in CI and weekly using the locked dependency export. Dependabot
+  proposes dependency and GitHub Actions updates; updates require review and passing checks.
+  A clean audit only covers vulnerabilities known to the advisory service at scan time.
 - Runbook retrieval is lexical and can surface loosely related sections; recommendations always ask
   the responder to confirm that guidance applies.
 

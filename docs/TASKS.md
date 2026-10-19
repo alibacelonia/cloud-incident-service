@@ -22,6 +22,12 @@ Each feature is a vertical slice that can be observed through the API or the tes
 
 ## Backlog
 
+Release maintenance (2026-10-19): Python 3.12–3.14 CI matrix, locked installation,
+scheduled dependency audit, and Dependabot configuration added for v0.1.0.
+The HTTPX/Starlette TestClient deprecation warning is tracked as M-01: evaluate the
+supported replacement, update test dependencies, and verify all API tests without the
+warning before removal of upstream compatibility support. Status: `todo`, priority P2.
+
 | ID | Priority | Status | Feature | Dependencies | Acceptance criteria |
 | --- | --- | --- | --- | --- | --- |
 | T-00 | P0 | done | Generate the starter application | none | Application and tests are present |
