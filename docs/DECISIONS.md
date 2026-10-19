@@ -48,3 +48,10 @@
 - **Context:** `project.yaml` enables `rag`, `vector_database`, and `document_processing`, while the handoff excludes production vector infrastructure and the constraints favour low cost and offline work.
 - **Decision:** Runbooks are synthetic Markdown fixtures, split into sections at load time (document processing) and searched by a deterministic lexical `RunbookRetriever` behind a protocol. No embedding model or vector database is used in the MVP.
 - **Consequences:** Retrieval is deterministic and free, but has weaker recall than semantic search. A vector store can replace the retriever behind the same protocol later. The owner confirmed this interpretation of `vector_database: true` (D-1).
+
+## ADR-008: Validate configuration at startup and map provider failures to safe errors
+
+- **Status:** accepted (2026-10-19; implements NFR-8)
+- **Context:** Misconfiguration previously surfaced only on the first request, `/health` always reported `ok`, and Bedrock SDK errors (missing credentials, access denied, unknown model, throttling) escaped as unhandled 500s whose messages can contain account or resource identifiers.
+- **Decision:** `Settings` is a frozen Pydantic model built from the environment. Validation errors become a `ConfigurationError` listing each offending variable, never its value. The FastAPI lifespan validates settings and constructs the provider, so startup fails fast. `/health` repeats that check without network calls and returns 503 when misconfigured. The Bedrock adapter runs boto3 in a worker thread, builds its client from a fresh session with an explicit region, and translates SDK exceptions into `ProviderInvocationError` with a stable code. The API maps "unavailable" failures to 503 and rejected or malformed responses to 502. Only codes are logged.
+- **Consequences:** Operators get immediate, actionable feedback without leaking values. Credentials cannot be verified without a network call, so `/health` reports readiness of configuration only. New Bedrock error codes default to `provider_request_failed` (502) until classified. No new dependency is added (`pydantic-settings` was not needed).

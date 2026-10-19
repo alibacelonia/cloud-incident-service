@@ -13,16 +13,18 @@
 
 ## Current baseline
 
-- `main.py` defines HTTP boundaries and dependency injection.
+- `main.py` defines HTTP boundaries, dependency injection, startup validation (lifespan), the
+  `/health` readiness check, and error mapping.
+- `config.py` validates settings from the environment and raises `ConfigurationError` (ADR-008).
 - `providers/` defines the provider protocol (`AIProvider.generate(prompt) -> str`), an offline mock,
-  and the selected Bedrock adapter.
+  and the Bedrock adapter in `providers/bedrock.py`, which translates SDK failures into
+  `ProviderInvocationError`.
 - `prompts/` stores prompt text outside Python code.
 - An in-memory retrieval seam provides deterministic local RAG behaviour and can later be replaced
   behind the same boundary.
 
 Known gaps against the target: no tool registry, orchestration, domain models, trace, or evaluation
-harness. The provider protocol supports text only, not tool use. `BedrockProvider.generate` calls
-synchronous boto3 inside an `async` function, which blocks the event loop (NFR-4).
+harness. The provider protocol supports text only, not tool use.
 
 ## Target MVP architecture
 
@@ -108,7 +110,9 @@ tests/
 | --- | --- |
 | Invalid request | 422 with field errors; nothing executed |
 | One or more tools unavailable or malformed | 200 with `status: partial` |
-| Selected provider misconfigured | 503 (existing `ProviderConfigurationError` mapping) |
+| Invalid settings | Startup fails; at request time 503 `configuration_invalid` |
+| Provider unavailable (credentials, access, throttling, connectivity) | 503 with a stable `code` |
+| Provider rejected the request or returned an unexpected response | 502 with a stable `code` |
 | Model output invalid after repair attempt | 502 `invalid_model_output` [D-7] |
 | Model loop limit or timeout exceeded | 504 or `partial`, to be settled alongside D-7 |
 

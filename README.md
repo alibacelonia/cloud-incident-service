@@ -24,6 +24,27 @@ curl -X POST http://localhost:8000/v1/generate \
 
 The default `mock` provider is deterministic and needs no API key. Prompt templates live under `src/cloud_incident_service/prompts/`. Selected external providers are initialized lazily and their credentials stay in environment variables.
 
+## Configuration
+
+| Variable | Values | Default |
+| --- | --- | --- |
+| `AI_PROVIDER` | `mock` or `bedrock` | `mock` |
+| `AI_MODEL` | Bedrock model or inference profile ID; required for `bedrock` | empty |
+| `AWS_REGION` | AWS region such as `us-east-1`; required for `bedrock` (`AWS_DEFAULT_REGION` is accepted as a fallback) | unset |
+
+Settings are validated at startup. If any value is invalid, uvicorn exits with
+`Application startup failed` and a message naming each offending variable (values are never
+printed). `GET /health` returns 200 with `"status": "ok"` when settings are valid, or 503 with
+`"status": "misconfigured"` and the same messages. It makes no network call, so AWS credentials
+are only checked on the first model call.
+
+Provider failures return a JSON body with a stable `code` and a safe `detail`:
+
+| Status | Codes |
+| --- | --- |
+| 503 | `configuration_invalid`, `provider_credentials_unavailable`, `provider_credentials_invalid`, `provider_access_denied`, `provider_throttled`, `provider_unavailable`, `provider_unreachable` |
+| 502 | `provider_request_rejected` (for example an unknown `AI_MODEL`), `provider_response_invalid`, `provider_request_failed` |
+
 ## Test and lint
 
 ```bash
@@ -32,7 +53,7 @@ uv run ruff check .
 uv run pytest
 ```
 
-Tests inject a fake provider and never call a live model, AWS, or a vector database.
+Tests inject a fake provider and never call a live model, AWS, or a vector database. A test guard fails any test that opens a network connection, and tests ignore your shell's AI and AWS settings.
 
 ## Requirements and Codex workflow
 
