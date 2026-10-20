@@ -27,7 +27,7 @@ Each feature is a vertical slice that can be observed through the API or the tes
 | R-01 | P1 | done | Publish v0.1.0 | passing release checks | Release commit e3fc095; green Python 3.12–3.14 CI matrix and audit; annotated v0.1.0 tag and GitHub release published 2026-10-19 |
 | V2-00 | P2 | done | Draft v0.2 requirements | MVP complete | `V0_2_PLAN.md` defines tests, limits, dependencies, and owner decisions; ADR-016 proposed |
 | V2-01 | P2 | done | Approve live-log scope and contract | owner approval | Seven decisions approved 2026-10-20 and recorded in `V0_2_PLAN.md` and ADR-016 |
-| V2-02 | P2 | in-progress (awaiting owner verification) | Implement CloudWatch adapter offline (delivered as F-14) | V2-01; explicit owner authorization | V2-01–V2-09 requirements pass with fake SDK clients; no live calls |
+| V2-02 | P2 | done | Implement CloudWatch adapter offline (delivered as F-14) | V2-01; explicit owner authorization | V2-01–V2-09 requirements pass with fake SDK clients; no live calls |
 | V2-03 | P2 | blocked | Live sandbox verification (test `tests/live/test_live_cloudwatch.py` is ready) | V2-02; approved run plan | V2-10 gates and agreed caps pass; no real data committed |
 | V2-04 | P2 | blocked | Repeated Bedrock reliability study | approved budget/run plan | Five proposed runs report pass variability, latency, tokens, and cost without altering the baseline |
 
@@ -55,7 +55,7 @@ warning before removal of upstream compatibility support. Status: `done` (verifi
 | F-11 | P1 | done | Release documentation: security posture, Bedrock IAM policy example, CHANGELOG | F-10 | SEC-8 policy example; a new contributor can run an investigation from the README; AC-14, AC-15 |
 | F-12 | P2 | done | Optional API-key authentication and request-size limit (SEC-7, SEC-6, ADR-017) | MVP complete | 401 without a valid key when `SERVICE_API_KEY` is set; 413 over 32 KiB; `/health` and `/docs` open; keys never logged; unset keeps the API open |
 | F-13 | P2 | done | Direct Anthropic API model client (P-03, ADR-018) | F-09 | `AI_PROVIDER=anthropic` runs the model path offline with a fake client; stable error codes; key never logged; live tests opt-in |
-| F-14 | P2 | in-progress (awaiting owner verification) | Opt-in CloudWatch Logs adapter, offline (V2-02, ADR-016) | V2-01 | Allowlist, `FilterLogEvents` only, caps, `truncated`, sanitizing, `origin` disclosure, fail-closed model rule; all proven with fake clients; no live calls |
+| F-14 | P2 | done | Opt-in CloudWatch Logs adapter, offline (V2-02, ADR-016) | V2-01 | Allowlist, `FilterLogEvents` only, caps, `truncated`, sanitizing, `origin` disclosure, fail-closed model rule; all proven with fake clients; no live calls |
 | P-01 | P2 | todo | Design human approval before any side-effecting tool | MVP complete | A new ADR covers approval flow, audit trail, and authorization; no side-effecting tool exists until it is accepted |
 | P-02 | P2 | in-progress | Real AWS read-only adapters behind the tool protocols (CloudWatch logs first, F-14; metrics, alarms, deployments, and changes remain) | MVP complete | Adapters live outside the domain layer; least-privilege IAM documented; covered by opt-in live tests only |
 | P-03 | P2 | done | Direct Anthropic API `ModelClient` adapter (delivered as F-13) | F-09 | Separate adapter with offline tests; live use is opt-in |
