@@ -35,7 +35,8 @@ Release maintenance (2026-10-19): Python 3.12–3.14 CI matrix, locked installat
 scheduled dependency audit, and Dependabot configuration added for v0.1.0.
 The HTTPX/Starlette TestClient deprecation warning is tracked as M-01: evaluate the
 supported replacement, update test dependencies, and verify all API tests without the
-warning before removal of upstream compatibility support. Status: `todo`, priority P2.
+warning before removal of upstream compatibility support. Status: `in-progress` (awaiting owner
+verification on `feature/m-01-testclient-httpx2`), priority P2.
 
 | ID | Priority | Status | Feature | Dependencies | Acceptance criteria |
 | --- | --- | --- | --- | --- | --- |

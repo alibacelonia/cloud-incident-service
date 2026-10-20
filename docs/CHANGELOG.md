@@ -3,6 +3,14 @@
 All notable project changes are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+
+- Test dependencies use `httpx2`, the HTTP backend Starlette's `TestClient` now supports, instead
+  of `httpx`; this removes the `StarletteDeprecationWarning`, and any Starlette deprecation now
+  fails the test suite.
+
 ## [0.1.0] - 2026-10-19
 
 First release of the incident investigation service, built from the `ai-service` profile

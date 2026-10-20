@@ -18,7 +18,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["httpx>=0.28,<1", "pytest>=8.3,<10", "ruff>=0.8,<1"]
+dev = ["httpx2>=2.15,<3", "pytest>=8.3,<10", "ruff>=0.8,<1"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/cloud_incident_service"]
@@ -28,6 +28,8 @@ testpaths = ["tests"]
 # Live tests call Amazon Bedrock; they are deselected unless run with `-m live` (NFR-3).
 addopts = "-m 'not live'"
 markers = ["live: calls Amazon Bedrock; opt-in with RUN_LIVE_TESTS=1 and `pytest -m live`"]
+# Starlette deprecations (for example its TestClient HTTP backend) fail the suite (M-01).
+filterwarnings = ["error::starlette.exceptions.StarletteDeprecationWarning"]
 
 [tool.ruff]
 line-length = 100
@@ -41,7 +43,7 @@ extend-immutable-calls = ["fastapi.Depends"]
 
 [dependency-groups]
 dev = [
-    "httpx>=0.28.1",
+    "httpx2>=2.15,<3",
     "pytest>=9.1.1",
 ]
 

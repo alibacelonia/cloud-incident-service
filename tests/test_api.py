@@ -133,3 +133,10 @@ def test_startup_succeeds_with_default_configuration() -> None:
 def test_default_suite_blocks_network_access() -> None:
     with pytest.raises(RuntimeError, match="Network access is disabled"):
         socket.create_connection(("example.com", 443))
+
+
+def test_test_client_uses_the_supported_http_backend() -> None:
+    # M-01: Starlette deprecated its httpx fallback; httpx2 avoids the deprecation warning.
+    import starlette.testclient
+
+    assert starlette.testclient.httpx.__name__ == "httpx2"
