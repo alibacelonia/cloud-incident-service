@@ -153,3 +153,15 @@
   - Keys are compared as SHA-256 digests with `hmac.compare_digest`, so length and prefix do not leak through timing. Rejections log only a fixed message. Invalid key settings name the variable and never the value.
   - Request bodies over 32 KiB return 413, checked from `Content-Length` and again while streaming. The streaming signal is a `BaseException` because FastAPI converts any `Exception` raised while reading the body into a generic 400.
 - **Consequences:** A shared key authenticates callers but gives no per-user identity, authorization, rate limiting, or rotation without a restart; those remain prerequisites for a real deployment, and approval workflows (P-01) still need user identity. The middleware reads settings on each `/v1/` request, like the rest of the service, so tests and operators change behaviour through the environment.
+
+## ADR-018: Direct Anthropic API as a second model provider
+
+- **Status:** accepted (2026-10-20; implements P-03 and ADR-005's provider-neutral `ModelClient`)
+- **Context:** ADR-005 kept the model client provider-neutral so another provider could be added without touching orchestration. The owner wants to run the investigation agent without an AWS account.
+- **Decision:**
+  - `AI_PROVIDER=anthropic` selects `AnthropicModelClient`, which maps the neutral conversation types to the Messages API (text, `tool_use`, and `tool_result` blocks; tool results as JSON strings) and normalizes stop reasons (`refusal` becomes `refused`; a context-window stop is treated as `max_tokens`). `anthropic` is a runtime dependency, like `boto3`.
+  - `AI_MODEL` and `ANTHROPIC_API_KEY` are required; the key is a `SecretStr` (20-512 ASCII characters, no whitespace) that is never logged, traced, or echoed, and `sk-ant-` keys are added to the redaction patterns. No region is needed.
+  - HTTP failures map by status to the existing stable codes: 401 `provider_credentials_invalid`, 403 `provider_access_denied`, 429 `provider_throttled`, 5xx and 529 `provider_unavailable`, other 4xx `provider_request_rejected`/`provider_request_failed`, connection and timeout `provider_unreachable`. Raw SDK messages are never returned or logged.
+  - Calls use a 5 s connect and 50 s read timeout and two retries; the orchestrator's 60 s limit still applies. No sampling temperature is sent, because the SDK no longer exposes one.
+  - Live tests follow `AI_PROVIDER` (`anthropic` selects the Anthropic API, anything else keeps Bedrock) and keep the 80% threshold and opt-in rules.
+- **Consequences:** Investigations can run with only an Anthropic key. Incident data and redacted evidence leave the machine for Anthropic, which `docs/SECURITY.md` documents. Provider behaviour differences (no temperature control, different refusal handling) mean prompt and rule changes must be re-verified live on each provider; the offline suite proves the mapping, not model quality.

@@ -54,9 +54,10 @@ warning before removal of upstream compatibility support. Status: `done` (verifi
 | F-10 | P1 | done | Opt-in live Bedrock tests and live evaluation | F-09, D-6 values | AC-12; runs bounded by time and tokens; results reported against D-6 thresholds |
 | F-11 | P1 | done | Release documentation: security posture, Bedrock IAM policy example, CHANGELOG | F-10 | SEC-8 policy example; a new contributor can run an investigation from the README; AC-14, AC-15 |
 | F-12 | P2 | done | Optional API-key authentication and request-size limit (SEC-7, SEC-6, ADR-017) | MVP complete | 401 without a valid key when `SERVICE_API_KEY` is set; 413 over 32 KiB; `/health` and `/docs` open; keys never logged; unset keeps the API open |
+| F-13 | P2 | in-progress (awaiting owner verification) | Direct Anthropic API model client (P-03, ADR-018) | F-09 | `AI_PROVIDER=anthropic` runs the model path offline with a fake client; stable error codes; key never logged; live tests opt-in |
 | P-01 | P2 | todo | Design human approval before any side-effecting tool | MVP complete | A new ADR covers approval flow, audit trail, and authorization; no side-effecting tool exists until it is accepted |
 | P-02 | P2 | todo | Real AWS read-only adapters behind the tool protocols | MVP complete | Adapters live outside the domain layer; least-privilege IAM documented; covered by opt-in live tests only |
-| P-03 | P2 | todo | Direct Anthropic API `ModelClient` adapter | F-09 | Separate adapter with offline tests; live use is opt-in |
+| P-03 | P2 | done | Direct Anthropic API `ModelClient` adapter (delivered as F-13) | F-09 | Separate adapter with offline tests; live use is opt-in |
 
 README usage is updated within each feature that changes how the service is run or called.
 

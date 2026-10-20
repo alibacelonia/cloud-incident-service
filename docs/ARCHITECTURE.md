@@ -25,6 +25,7 @@ FastAPI boundary (main.py)
             -> ModelOrchestrator (ORCHESTRATOR=model, bounded loop)
                 -> ModelClient protocol (providers/)
                     -> BedrockModelClient (AI_PROVIDER=bedrock, Converse with tool use)
+                    -> AnthropicModelClient (AI_PROVIDER=anthropic, Messages API with tool use)
                     -> RuleBasedModelClient (AI_PROVIDER=mock, offline stand-in)
             -> ToolSession -> ToolRegistry (read-only tools only, tools/)
                 -> cloudwatch_signals      (fixture-backed)
@@ -46,7 +47,7 @@ Evaluation runner (evaluation/) -> InvestigationService over fixtures/evaluation
 | `orchestration/` | `Orchestrator` protocol; `DeterministicOrchestrator` with rule-based findings (ADR-010); `ModelOrchestrator` (ADR-013) whose hypotheses are checked against the correlation rules in `grounding.py` (ADR-015); `RuleBasedModelClient`; `build_orchestrator` |
 | `correlation/` | Pure rules: abnormal signals and onset, changes within 30 minutes before onset (A-3), stale sources (A-4), contradictions via shared `entity` attributes (A-5), instruction-like text (ADR-012) |
 | `tools/` | `Tool` protocol, `ToolRegistry`, `ToolSession`, the four fixture-backed tools (D-8), runbook parsing and retrieval (D-1, ADR-007) |
-| `providers/` | `ModelClient` protocol and conversation types; `BedrockModelClient` with timeouts and safe error mapping |
+| `providers/` | `ModelClient` protocol and conversation types; `BedrockModelClient` and `AnthropicModelClient`, each with timeouts and safe error mapping to the same `provider_*` codes (ADR-018) |
 | `prompts/` | Versioned prompt templates; `investigation_v4.txt` is current, earlier versions are kept for comparison |
 | `tracing/` | `InvestigationTrace`, `TraceRecorder`, `FileTraceSink`, `InMemoryTraceSink`, `TRACE_DIR` checks (D-3, ADR-006, ADR-011) |
 | `redaction.py` | Pattern-based secret redaction for tool output, symptoms, and traces (ADR-011) |
