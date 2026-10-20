@@ -33,7 +33,7 @@ HypothesisId = Annotated[str, StringConstraints(pattern=r"^[a-z0-9][a-z0-9-]{0,6
 ToolName = Annotated[str, StringConstraints(pattern=r"^[a-z][a-z0-9_]{0,63}$")]
 Statement = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1_000)]
 Level = Literal["low", "medium", "high"]
-DataSourceStatus = Literal["ok", "empty", "stale", "unavailable", "malformed"]
+DataSourceStatus = Literal["ok", "empty", "stale", "truncated", "unavailable", "malformed"]
 AttributeValue = str | int | float | bool | None
 
 _FROZEN = ConfigDict(frozen=True, extra="forbid")
@@ -122,6 +122,7 @@ class DataSource(BaseModel):
 
     tool: ToolName
     status: DataSourceStatus
+    origin: Literal["fixture", "live"] = "fixture"
 
 
 class Provenance(BaseModel):
@@ -186,7 +187,11 @@ class Findings(BaseModel):
         if self.status == "complete":
             if not self.data_sources:
                 raise ValueError("a complete report requires at least one data source")
-            failed = [s.tool for s in self.data_sources if s.status in ("unavailable", "malformed")]
+            failed = [
+                s.tool
+                for s in self.data_sources
+                if s.status in ("unavailable", "malformed", "truncated")
+            ]
             if failed:
                 raise ValueError(
                     f"report must be partial; unavailable sources: {', '.join(failed)}"

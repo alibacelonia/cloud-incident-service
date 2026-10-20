@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from functools import lru_cache
 from typing import Literal
 
 from fastapi import Depends, FastAPI, Request, Response, Security
@@ -29,6 +28,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     try:
         settings = Settings.from_environment()
         build_orchestrator(settings)
+        registry_for(settings)
         if settings.trace_dir is not None:
             check_trace_directory(settings.trace_dir, create=True)
     except ConfigurationError as exc:
@@ -37,6 +37,12 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     logger.info(
         "Configuration valid: provider=%s orchestrator=%s", settings.provider, settings.orchestrator
     )
+    if settings.log_source == "cloudwatch":
+        logger.warning(
+            "LOG_SOURCE=cloudwatch: cloudwatch_signals reads live logs from %d allowlisted log "
+            "group(s); other tools remain synthetic fixtures.",
+            len(settings.cloudwatch_log_groups),
+        )
     if settings.service_api_key is None:
         logger.warning(
             "SERVICE_API_KEY is not set: the API is unauthenticated. Keep it bound to 127.0.0.1."
@@ -96,6 +102,7 @@ def health(response: Response) -> HealthResponse:
     try:
         settings = Settings.from_environment()
         build_orchestrator(settings)
+        registry_for(settings)
         if settings.trace_dir is not None:
             check_trace_directory(settings.trace_dir, create=False)
     except ConfigurationError as exc:
@@ -104,15 +111,27 @@ def health(response: Response) -> HealthResponse:
     return HealthResponse(status="ok", provider=settings.provider)
 
 
-@lru_cache(maxsize=1)
-def default_registry() -> ToolRegistry:
-    return build_default_registry()
+_registries: dict[tuple[object, ...], ToolRegistry] = {}
+
+
+def registry_for(settings: Settings) -> ToolRegistry:
+    """One registry per tool configuration, so a live AWS client is built once, not per request."""
+    key = (
+        settings.log_source,
+        tuple(sorted(settings.cloudwatch_log_groups.items())),
+        settings.aws_region,
+    )
+    if key not in _registries:
+        _registries[key] = build_default_registry(settings)
+    return _registries[key]
 
 
 def get_investigation_service() -> InvestigationService:
     settings = Settings.from_environment()
     sink = FileTraceSink(settings.trace_dir) if settings.trace_dir is not None else None
-    return InvestigationService(build_orchestrator(settings), default_registry(), trace_sink=sink)
+    return InvestigationService(
+        build_orchestrator(settings), registry_for(settings), trace_sink=sink
+    )
 
 
 @app.post(

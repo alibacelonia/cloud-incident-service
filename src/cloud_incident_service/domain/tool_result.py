@@ -8,7 +8,8 @@ from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, StringConstrai
 from cloud_incident_service.domain.report import Evidence, ToolName
 from cloud_incident_service.domain.request import to_utc
 
-ToolStatus = Literal["ok", "empty", "unavailable", "malformed"]
+ToolStatus = Literal["ok", "empty", "truncated", "unavailable", "malformed"]
+SourceOrigin = Literal["fixture", "live"]
 
 
 class ToolResult(BaseModel):
@@ -18,6 +19,8 @@ class ToolResult(BaseModel):
 
     tool: ToolName
     status: ToolStatus
+    # "live" marks data read from a real system; every MVP tool is a synthetic fixture (D-8).
+    origin: SourceOrigin = "fixture"
     data_as_of: AwareDatetime | None = None
     evidence: list[Evidence] = Field(default_factory=list)
     # A safe, value-free description of why the call failed; never raw tool output.

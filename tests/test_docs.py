@@ -40,24 +40,50 @@ def test_iam_policy_examples_exist() -> None:
     assert [path.name for path in IAM_POLICIES] == [
         "bedrock-invoke-inference-profile-policy.json",
         "bedrock-invoke-model-policy.json",
+        "cloudwatch-logs-filter-log-events-policy.json",
     ]
 
 
-@pytest.mark.parametrize("path", IAM_POLICIES, ids=lambda path: path.name)
-def test_iam_policies_grant_only_model_invocation(path: Path) -> None:
+def statements(path: Path) -> list[tuple[str, list[str], list[str]]]:
     policy = json.loads(path.read_text(encoding="utf-8"))
-
     assert policy["Version"] == "2012-10-17"
+    found = []
     for statement in policy["Statement"]:
-        actions = statement["Action"]
-        resources = statement["Resource"]
-        actions = [actions] if isinstance(actions, str) else actions
-        resources = [resources] if isinstance(resources, str) else resources
         assert statement["Effect"] == "Allow"
+        actions, resources = statement["Action"], statement["Resource"]
+        found.append(
+            (
+                statement["Sid"],
+                [actions] if isinstance(actions, str) else actions,
+                [resources] if isinstance(resources, str) else resources,
+            )
+        )
+    return found
+
+
+BEDROCK_POLICIES = [path for path in IAM_POLICIES if path.name.startswith("bedrock-")]
+
+
+@pytest.mark.parametrize("path", BEDROCK_POLICIES, ids=lambda path: path.name)
+def test_bedrock_policies_grant_only_model_invocation(path: Path) -> None:
+    for _, actions, resources in statements(path):
         assert actions == ["bedrock:InvokeModel"]
         assert resources and "*" not in resources
         assert all(resource.startswith("arn:aws:bedrock:") for resource in resources)
         assert any("foundation-model/<model-id>" in resource for resource in resources)
+
+
+def test_logs_policy_grants_only_filter_log_events_on_named_log_groups() -> None:
+    path = ROOT / "docs" / "iam" / "cloudwatch-logs-filter-log-events-policy.json"
+
+    [(_, actions, resources)] = statements(path)
+
+    assert actions == ["logs:FilterLogEvents"]  # no write, no Logs Insights, no wildcards
+    assert resources and all(
+        resource.startswith("arn:aws:logs:<region>:<account-id>:log-group:<log-group-name>")
+        for resource in resources
+    )
+    assert not any(resource.rstrip(":*").endswith("*") for resource in resources)
 
 
 def test_security_document_covers_every_security_requirement() -> None:

@@ -132,16 +132,19 @@
 
 ## ADR-016: First live source is an opt-in, bounded CloudWatch log adapter
 
-- **Status:** proposed; owner approval required before implementation modifications.
-- **Context:** v0.1 is complete; P-02 proposes live AWS sources. A small first adapter needs
-  explicit scope, resource authorization, collection bounds, and a data policy.
-- **Proposed decision:** Implement one-account/region allowlisted log collection using only
-  `FilterLogEvents`, behind the existing tool protocol. Keep fixture defaults, require offline
-  tests, expose incomplete collection, and disable live evidence transfer to Bedrock by default.
-  See `V0_2_PLAN.md` for testable requirements, proposed limits, and unresolved decisions.
-- **Consequences:** Live logs can extend the portfolio while preserving the current boundaries.
-  Metrics, alarms, cross-account discovery, writes, and production deployment remain deferred.
-  No AWS/IAM changes or paid tests are authorized by this proposal.
+- **Status:** accepted (2026-10-20; implements V2-01 to V2-09, extends ADR-004)
+- **Context:** v0.1 is complete and P-02 proposes live AWS sources. A small first adapter needs explicit scope, resource authorization, collection bounds, and a data policy. The owner approved the seven decisions in `V0_2_PLAN.md` for offline implementation.
+- **Decision:**
+  - `LOG_SOURCE=cloudwatch` swaps `cloudwatch_signals` for `CloudWatchLogsTool`; the default `fixture` never imports an AWS session or builds a client. The tool name, input model, and evidence shapes are unchanged. Only log events are read; `deployment_history`, `infrastructure_changes`, and `runbook_search` stay fixtures.
+  - `CLOUDWATCH_LOG_GROUPS` is a JSON allowlist of `service/environment` to log group (at most 50 entries, names validated, values never echoed). The tool input has no log group, account, region, or query field. Unmapped requests fail before any SDK call as `LogGroupNotConfiguredError`.
+  - The only SDK call is `filter_log_events` with `logGroupName`, `startTime`, `endTime`, `limit=100`, and `nextToken`. Limits are 3 pages, 100 events, 64 KiB of raw message bytes read, and a 4-second deadline; the client uses `total_max_attempts=1` with 1 s connect and 2 s read timeouts (botocore's `max_attempts=1` still allows a retry). Pages with no events are followed within the page cap; a repeated continuation token or any cap stops collection as `truncated`. A deadline with no events is `unavailable`.
+  - A new `truncated` status exists on `ToolResult` and `DataSource`; it makes the report `partial` and adds an uncertainty. `ToolResult` and `DataSource` also carry `origin` (`fixture` or `live`), and any report that mixes origins gains a "Mixed sources" uncertainty.
+  - Severity: a JSON object whose `level` is error, fatal, critical, or severe becomes an `ERROR` `log_event` (an abnormal signal); warn and info-like levels become `log_event` at that level; everything else, including free text containing the word "error", becomes `log_context`. JSON naming another `service` or `environment` is dropped.
+  - Sanitizing: secret-keyed JSON values are redacted, control characters and URLs are removed, `redact_text` runs, whitespace is collapsed, and text is cut to 300 characters. Source IDs are `log:<service>:cw-<sha256 prefix of log group and event ID>`.
+  - Failures map to classes named for their cause (`LogAccessDeniedError`, `LogThrottledError`, `LogGroupNotFoundError`, `LogCredentialsError`, `LogUnreachableError`, `LogTimeoutError`, `LogRequestFailedError`); only that name is traced, and only AWS error codes are logged.
+  - Fail closed: `LOG_SOURCE=cloudwatch` with `ORCHESTRATOR=model` and a real provider requires `ALLOW_LIVE_EVIDENCE_TO_MODEL=1`, or settings validation fails at startup, `/health`, and requests. The deterministic orchestrator and the offline stand-in are unaffected.
+  - Live verification is separate (V2-10): `tests/live/test_live_cloudwatch.py` needs `RUN_LIVE_TESTS=1` and `RUN_LIVE_LOG_TESTS=1`, makes one bounded read with no model, and skips with a reason otherwise.
+- **Consequences:** Real logs can feed the existing correlation without touching orchestration, and every limit and failure is visible in the report. Correlating live logs with synthetic deployments is illustrative, which the report states. Sanitizing is pattern-based, and the 300-character cap loses detail. The live path has been proven only against a fake client until the owner approves a sandbox run. Metrics, alarms, cross-account access, writes, and production deployment remain out of scope.
 
 ## ADR-017: Optional shared API key and request-size limit
 

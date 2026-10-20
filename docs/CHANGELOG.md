@@ -7,6 +7,12 @@ All notable project changes are recorded here. The format follows
 
 ### Added
 
+- Opt-in live CloudWatch Logs source (`LOG_SOURCE=cloudwatch`) behind `cloudwatch_signals`: an
+  allowlist of log groups, `logs:FilterLogEvents` only, capped pages, events, bytes, and time,
+  sanitized evidence with hashed IDs, structured-`level` severity, a new `truncated` status, and a
+  per-source `origin` that discloses mixing live and synthetic data (ADR-016). Live evidence is
+  blocked from real models unless `ALLOW_LIVE_EVIDENCE_TO_MODEL=1`. Verified offline with a fake
+  client; an opt-in live read test is included.
 - Direct Anthropic API model provider: `AI_PROVIDER=anthropic` with `AI_MODEL` and
   `ANTHROPIC_API_KEY`, reusing the model orchestrator, validation, and stable error codes
   (ADR-018). Live tests follow `AI_PROVIDER`.

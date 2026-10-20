@@ -72,3 +72,44 @@ def live_settings(environ: Mapping[str, str]) -> Settings:
     return Settings.from_environment(
         {**environ, "AI_PROVIDER": live_provider(environ), "ORCHESTRATOR": "model", "TRACE_DIR": ""}
     )
+
+
+MAX_LIVE_LOG_WINDOW_MINUTES = 60
+DEFAULT_LIVE_LOG_WINDOW_MINUTES = 15
+
+
+def live_log_skip_reason(environ: Mapping[str, str]) -> str | None:
+    """Why the live CloudWatch read cannot run, or None; it has its own opt-in (V2-10)."""
+    if environ.get("RUN_LIVE_TESTS") != "1":
+        return "live tests are disabled; set RUN_LIVE_TESTS=1"
+    if environ.get("RUN_LIVE_LOG_TESTS") != "1":
+        return (
+            "live log reads are disabled; set RUN_LIVE_LOG_TESTS=1 only for a sandbox log group "
+            "you are authorized to read"
+        )
+    if not (environ.get("AWS_REGION") or environ.get("AWS_DEFAULT_REGION") or "").strip():
+        return "AWS_REGION is not set"
+    for name in ("LIVE_LOG_SERVICE", "LIVE_LOG_ENVIRONMENT"):
+        if not environ.get(name, "").strip():
+            return f"{name} is not set"
+    try:
+        settings = Settings.from_environment(
+            {
+                **environ,
+                "LOG_SOURCE": "cloudwatch",
+                "ORCHESTRATOR": "deterministic",
+                "AI_PROVIDER": "mock",
+            }
+        )
+    except ConfigurationError as exc:
+        return f"invalid live log configuration: {exc}"
+    key = f"{environ['LIVE_LOG_SERVICE'].strip()}/{environ['LIVE_LOG_ENVIRONMENT'].strip()}"
+    if key not in settings.cloudwatch_log_groups:
+        return "LIVE_LOG_SERVICE/LIVE_LOG_ENVIRONMENT is not in CLOUDWATCH_LOG_GROUPS"
+    try:
+        minutes = int(environ.get("LIVE_LOG_WINDOW_MINUTES", DEFAULT_LIVE_LOG_WINDOW_MINUTES))
+    except ValueError:
+        return "LIVE_LOG_WINDOW_MINUTES must be a whole number"
+    if not 1 <= minutes <= MAX_LIVE_LOG_WINDOW_MINUTES:
+        return f"LIVE_LOG_WINDOW_MINUTES must be between 1 and {MAX_LIVE_LOG_WINDOW_MINUTES}"
+    return None

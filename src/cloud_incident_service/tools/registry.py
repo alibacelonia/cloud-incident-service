@@ -155,12 +155,17 @@ class ToolSession:
             self._observer.record_validation(check, error)
 
     async def _run(self, tool: Tool, query: object) -> ToolResult:
+        origin = tool.output_model.origin
         try:
             raw = await asyncio.wait_for(tool.run(query), timeout=self._timeout_seconds)
         except TimeoutError:
-            return ToolResult(tool=tool.name, status="unavailable", error="timed out")
+            return ToolResult(
+                tool=tool.name, status="unavailable", origin=origin, error="timed out"
+            )
         except Exception as exc:  # Any tool failure is contained as an unavailable source.
-            return ToolResult(tool=tool.name, status="unavailable", error=type(exc).__name__)
+            return ToolResult(
+                tool=tool.name, status="unavailable", origin=origin, error=type(exc).__name__
+            )
 
         try:
             output = tool.output_model.model_validate(raw)
@@ -169,11 +174,14 @@ class ToolSession:
             return ToolResult(
                 tool=tool.name,
                 status="malformed",
+                origin=origin,
                 error=f"output failed validation: {exc.error_count()} error(s)",
             )
+        status = "truncated" if output.incomplete else ("ok" if evidence else "empty")
         return ToolResult(
             tool=tool.name,
-            status="ok" if evidence else "empty",
+            status=status,
+            origin=output.origin,
             data_as_of=output.data_as_of,
             evidence=sorted(evidence, key=lambda item: (item.timestamp, item.source_id)),
         )

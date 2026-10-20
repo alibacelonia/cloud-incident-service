@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Literal, Protocol
+from typing import Any, ClassVar, Literal, Protocol
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, field_validator
 
@@ -31,6 +31,13 @@ class ToolOutput(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     data_as_of: AwareDatetime
+    # Where the data comes from; live adapters override this (disclosed in reports).
+    origin: ClassVar[Literal["fixture", "live"]] = "fixture"
+
+    @property
+    def incomplete(self) -> bool:
+        """True when collection stopped at a limit, so the evidence is a partial view."""
+        return False
 
     def to_evidence(self) -> list[Evidence]:
         raise NotImplementedError

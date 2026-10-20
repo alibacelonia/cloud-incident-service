@@ -43,7 +43,7 @@ requires approval. Interactive API docs are at `http://localhost:8000/docs`.
 
 | Field | Meaning |
 | --- | --- |
-| `status` | `complete`, or `partial` when a source was unavailable or malformed |
+| `status` | `complete`, or `partial` when a source was unavailable, malformed, or truncated |
 | `summary` | The first abnormal signal and the leading hypothesis |
 | `evidence`, `timeline` | Evidence returned by tools, each with a stable `source_id`; the timeline lists events in order |
 | `facts` | Statements that cite the evidence supporting them |
@@ -51,7 +51,7 @@ requires approval. Interactive API docs are at `http://localhost:8000/docs`.
 | `uncertainties` | Missing, stale, contradictory, or suspicious data |
 | `next_steps` | Diagnostic actions, each tied to evidence or a hypothesis |
 | `remediation_proposals` | Suggested changes, always with `requires_human_approval: true` |
-| `data_sources`, `provenance` | Each tool's status, and which orchestrator, model, and prompt version produced the report |
+| `data_sources`, `provenance` | Each tool's status (`ok`, `empty`, `stale`, `truncated`, `unavailable`, `malformed`) and origin (`fixture` or `live`), and which orchestrator, model, and prompt version produced the report |
 
 Requests need a `service` (lowercase letters, digits, hyphens), an `environment` (`production`,
 `staging`, or `development`), `symptoms` (up to 2,000 characters), and a `time_range` of at most
@@ -59,7 +59,7 @@ Requests need a `service` (lowercase letters, digits, hyphens), an `environment`
 
 ## How it works
 
-Four read-only tools return evidence from synthetic fixtures: `cloudwatch_signals` (alarms,
+Four read-only tools return evidence from synthetic fixtures by default: `cloudwatch_signals` (alarms,
 metrics, logs), `deployment_history` and `infrastructure_changes` (including the 60 minutes before
 the window), and `runbook_search` (Markdown runbooks ranked against the symptoms). An abnormal
 signal is an alarm entering `ALARM` or an error log; any change that started up to 30 minutes
@@ -109,7 +109,11 @@ Copy `.env.example` for reference; settings are read from environment variables.
 | `MODEL_MAX_OUTPUT_TOKENS` | Output-token cap per model turn, 256–8192 | `2048` |
 | `TRACE_DIR` | Directory for investigation trace files, for example `.traces` (git-ignored); created at startup if missing | unset (no trace files) |
 | `SERVICE_API_KEY` | Secret that callers must send in the `X-API-Key` header, 32–256 ASCII characters without whitespace | unset (no authentication) |
+| `LOG_SOURCE` | `fixture` or `cloudwatch`; `cloudwatch` makes `cloudwatch_signals` read live CloudWatch Logs | `fixture` |
+| `CLOUDWATCH_LOG_GROUPS` | JSON object mapping `service/environment` to a log group name; required for `cloudwatch` | unset |
+| `ALLOW_LIVE_EVIDENCE_TO_MODEL` | `1` allows live log evidence to be sent to a real model (`bedrock`/`anthropic` with `ORCHESTRATOR=model`) | unset (blocked) |
 | `RUN_LIVE_TESTS` | `1` to enable live model tests (Bedrock or Anthropic) | unset |
+| `RUN_LIVE_LOG_TESTS` | `1` additionally enables the live CloudWatch read test (plus `LIVE_LOG_SERVICE`, `LIVE_LOG_ENVIRONMENT`, optional `LIVE_LOG_WINDOW_MINUTES`) | unset |
 
 Settings are validated at startup. If any value is invalid, uvicorn exits with
 `Application startup failed` and a message naming each offending variable (values are never
@@ -176,6 +180,64 @@ Keys are compared in constant time and are never logged or traced. To rotate a k
 server with a new value. Authentication is checked before the body is read, and request bodies over
 32 KiB are rejected with 413. This is a single shared key, not user accounts: use TLS in front of
 the service before exposing it beyond localhost.
+
+## Reading live CloudWatch logs (opt-in)
+
+By default every tool is a synthetic fixture and no AWS client is ever created. Set
+`LOG_SOURCE=cloudwatch` and `cloudwatch_signals` reads **log events only** from CloudWatch Logs
+instead (no metrics or alarms); `deployment_history`, `infrastructure_changes`, and
+`runbook_search` stay synthetic, and the report says so in a "Mixed sources" uncertainty and in each
+source's `origin`.
+
+What it will and will not do:
+
+- It reads only the log groups you list in `CLOUDWATCH_LOG_GROUPS`, in one account and region
+  (`AWS_REGION`). Callers and models cannot choose a log group, account, or region.
+- The only AWS call is `logs:FilterLogEvents`, with a window (the incident time range), no filter
+  pattern, and at most 3 pages, 100 events, 64 KiB of raw log text, and 4 seconds. Hitting a limit
+  returns status `truncated`, the report becomes `partial`, and an uncertainty says events may be
+  missing.
+- Only **structured JSON logs with a `level` field** count as abnormal signals (`error`, `fatal`,
+  `critical`, `severe` become `ERROR`). Free text is context only, so a log line that merely
+  contains the word "error" never starts a hypothesis. Events whose JSON names another `service` or
+  `environment` are dropped.
+- Each event is stripped of control characters, URLs, access keys, account IDs, emails, bearer
+  tokens, and secret-looking JSON keys, and shortened to 300 characters. Evidence IDs are hashes
+  (`log:<service>:cw-<hash>`), so neither the log group name nor the event ID is exposed.
+- With `ORCHESTRATOR=model` and a real model (`bedrock` or `anthropic`) it refuses to start unless
+  you also set `ALLOW_LIVE_EVIDENCE_TO_MODEL=1`, because sanitized log text would then leave your
+  machine. The deterministic orchestrator and the offline stand-in send nothing anywhere.
+
+**To try it against your own sandbox (never production data):**
+
+1. Create a log group and put a few synthetic JSON events in it, for example
+   `{"level":"ERROR","service":"payments-api","environment":"production","message":"db timeout"}`.
+2. Attach a policy allowing only `logs:FilterLogEvents` on that group: copy
+   [docs/iam/cloudwatch-logs-filter-log-events-policy.json](docs/iam/cloudwatch-logs-filter-log-events-policy.json)
+   and replace the `<placeholders>`.
+3. Log in (`aws sso login --profile <profile>`) and start the server:
+
+```bash
+AWS_PROFILE=<profile> AWS_REGION=<region> LOG_SOURCE=cloudwatch \
+CLOUDWATCH_LOG_GROUPS='{"payments-api/production": "<your-log-group>"}' \
+uv run uvicorn cloud_incident_service.main:app
+```
+
+4. Investigate a window that contains your events (request body as in the quick start, using
+   `"service": "payments-api"`, `"environment": "production"`, and your timestamps). Check that
+   `data_sources` shows `cloudwatch_signals` with `"origin": "live"`.
+5. Optionally run the live read test, which makes one bounded read and calls no model:
+
+```bash
+AWS_PROFILE=<profile> RUN_LIVE_TESTS=1 RUN_LIVE_LOG_TESTS=1 AWS_REGION=<region> \
+CLOUDWATCH_LOG_GROUPS='{"payments-api/production": "<your-log-group>"}' \
+LIVE_LOG_SERVICE=payments-api LIVE_LOG_ENVIRONMENT=production \
+uv run pytest -m live -s tests/live/test_live_cloudwatch.py
+```
+
+Reading logs can incur CloudWatch charges and exposes whatever your log group contains: use
+synthetic data in an account you are authorized to use. Sanitizing is pattern-based and can miss
+unusual secrets.
 
 ## Investigation traces
 
@@ -244,8 +306,9 @@ AI_PROVIDER=bedrock AI_MODEL=<model-id> AWS_REGION=<region> \
 
 ## Project documents
 
-The next release is scoped in [the proposed v0.2 plan](docs/V0_2_PLAN.md). Implementation
-and live AWS/model runs require the owner's separate approvals recorded there.
+The first live source is scoped in [the v0.2 plan](docs/V0_2_PLAN.md). Its offline adapter is
+implemented; live sandbox reads and paid model studies need the owner's separate approvals
+recorded there.
 
 | Document | Contents |
 | --- | --- |
