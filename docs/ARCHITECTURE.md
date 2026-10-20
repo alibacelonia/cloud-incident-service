@@ -46,7 +46,7 @@ Evaluation runner (evaluation/) -> InvestigationService over fixtures/evaluation
 | `application/` | `InvestigationService`: redacts symptoms, opens a `ToolSession` per investigation, assembles and validates the report, rejects evidence no tool returned (ADR-009), records and exports the trace |
 | `orchestration/` | `Orchestrator` protocol; `DeterministicOrchestrator` with rule-based findings (ADR-010); `ModelOrchestrator` (ADR-013) whose hypotheses are checked against the correlation rules in `grounding.py` (ADR-015); `RuleBasedModelClient`; `build_orchestrator` |
 | `correlation/` | Pure rules: abnormal signals and onset, changes within 30 minutes before onset (A-3), stale sources (A-4), contradictions via shared `entity` attributes (A-5), instruction-like text (ADR-012) |
-| `tools/` | `Tool` protocol, `ToolRegistry`, `ToolSession`, the four fixture-backed tools (D-8), runbook parsing and retrieval (D-1, ADR-007) |
+| `tools/` | `Tool` protocol, `ToolRegistry`, `ToolSession`, the four read-only tools (D-8; fixture-backed, with `cloudwatch_signals` optionally swapped for the live `CloudWatchLogsTool` in `cloudwatch_logs.py`, ADR-016), runbook parsing and retrieval (D-1, ADR-007) |
 | `providers/` | `ModelClient` protocol and conversation types; `BedrockModelClient` and `AnthropicModelClient`, each with timeouts and safe error mapping to the same `provider_*` codes (ADR-018) |
 | `prompts/` | Versioned prompt templates; `investigation_v4.txt` is current, earlier versions are kept for comparison |
 | `tracing/` | `InvestigationTrace`, `TraceRecorder`, `FileTraceSink`, `InMemoryTraceSink`, `TRACE_DIR` checks (D-3, ADR-006, ADR-011) |
@@ -111,6 +111,8 @@ Evaluation runner (evaluation/) -> InvestigationService over fixtures/evaluation
 | Invalid settings | Startup fails; `/health` returns 503 `misconfigured`; requests return 503 `configuration_invalid` |
 | Provider unavailable (credentials, access, throttling, connectivity) | 503 with a stable `provider_*` code |
 | Provider rejected the request or returned an unexpected response | 502 with a stable `provider_*` code |
+| A source stopped at a collection limit | 200 with `partial` and that source's status `truncated` |
+| Live log read failed (access, throttling, missing group, credentials, timeout) | 200 with `partial` and that source `unavailable`; only a safe reason is traced |
 | Model output invalid after one repair attempt | 502 `invalid_model_output` |
 | Model turn limit reached | 502 `model_turn_limit` |
 | Model loop exceeded 60 seconds | 504 `model_timeout` |

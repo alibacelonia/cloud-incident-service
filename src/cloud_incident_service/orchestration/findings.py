@@ -41,7 +41,7 @@ from cloud_incident_service.domain import (
 RUNBOOK_SEARCH = "runbook_search"
 RUNBOOK_SECTION = "runbook_section"
 CHANGE_TOOLS = ("deployment_history", "infrastructure_changes")
-FAILED_STATUSES = ("unavailable", "malformed")
+FAILED_STATUSES = ("unavailable", "malformed", "truncated")
 SUMMARY_LIMIT = 1_000
 _CONFIDENCE_ORDER = {"high": 0, "medium": 1, "low": 2}
 
@@ -65,14 +65,15 @@ class SourceSummary:
         return [item.source_id for item in self.events]
 
 
-_STATUS_PRIORITY = {"ok": 0, "empty": 1, "malformed": 2, "unavailable": 3}
+_STATUS_PRIORITY = {"ok": 0, "empty": 1, "truncated": 2, "malformed": 3, "unavailable": 4}
 
 
 def merge_results(results: list[ToolResult]) -> list[ToolResult]:
     """One result per tool, in first-call order, for tools called more than once.
 
-    Evidence is de-duplicated by source ID, the best status wins (ok, empty, malformed,
-    unavailable), and the earliest `data_as_of` is kept so staleness is not hidden.
+    Evidence is de-duplicated by source ID, the best status wins (ok, empty, truncated,
+    malformed, unavailable), a live origin is kept, and the earliest `data_as_of` is kept so
+    staleness is not hidden.
     """
     grouped: dict[str, list[ToolResult]] = {}
     for result in results:
@@ -89,6 +90,7 @@ def merge_results(results: list[ToolResult]) -> list[ToolResult]:
             ToolResult(
                 tool=tool,
                 status=best.status,
+                origin="live" if any(item.origin == "live" for item in group) else "fixture",
                 data_as_of=min(dates) if dates else None,
                 evidence=list(evidence.values()),
                 error=best.error,
@@ -112,7 +114,11 @@ def summarize_sources(request: IncidentRequest, results: list[ToolResult]) -> So
         failed=failed,
         stale=stale,
         data_sources=[
-            DataSource(tool=result.tool, status="stale" if result.tool in stale else result.status)
+            DataSource(
+                tool=result.tool,
+                status="stale" if result.tool in stale else result.status,
+                origin=result.origin,
+            )
             for result in results
         ],
         source_uncertainties=_source_uncertainties(results, stale),
@@ -414,6 +420,16 @@ def _source_uncertainties(results: list[ToolResult], stale: Set[str]) -> list[Un
                     description=f"{tool} returned malformed data, which was excluded.", tool=tool
                 )
             )
+        elif result.status == "truncated":
+            items.append(
+                Uncertainty(
+                    description=(
+                        f"{tool} stopped at a collection limit, so its evidence is incomplete "
+                        "and events may be missing."
+                    ),
+                    tool=tool,
+                )
+            )
         if tool in stale and result.data_as_of is not None:
             items.append(
                 Uncertainty(
@@ -424,7 +440,25 @@ def _source_uncertainties(results: list[ToolResult], stale: Set[str]) -> list[Un
                     tool=tool,
                 )
             )
+    items.extend(_mixed_source_uncertainty(results))
     return items
+
+
+def _mixed_source_uncertainty(results: list[ToolResult]) -> list[Uncertainty]:
+    """Disclose when live data is combined with synthetic fixtures (V2-08)."""
+    live = [result.tool for result in results if result.origin == "live"]
+    synthetic = [result.tool for result in results if result.origin != "live"]
+    if not live or not synthetic:
+        return []
+    return [
+        Uncertainty(
+            description=(
+                f"Mixed sources: {', '.join(live)} returned live data, while "
+                f"{', '.join(synthetic)} are synthetic fixtures, so correlations across them "
+                "are illustrative."
+            ),
+        )
+    ]
 
 
 def _instruction_uncertainties(evidence: list[Evidence]) -> list[Uncertainty]:

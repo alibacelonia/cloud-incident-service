@@ -1,7 +1,9 @@
 # v0.2 proposal: one real CloudWatch read adapter
 
-Status: proposed, awaiting owner approval. This document does not authorize implementation,
-AWS access, provisioning, IAM changes, live model calls, or publication of real data.
+Status: scope and requirements **approved by the owner on 2026-10-20**; the offline adapter is
+implemented (F-14). Approval covers offline implementation only. It does not authorize AWS access,
+provisioning, IAM changes, live reads, live model calls, or publication of real data: those need
+the separate approvals below.
 The approved v0.1 requirements and `project.yaml` remain authoritative.
 
 ## Intended outcome
@@ -38,7 +40,22 @@ Fixture adapters remain the default and offline evaluation remains mandatory.
    on 2026-10-19. Preserve small commits and a reviewed rollback path. Never use destructive Git
    rollback or overwrite unrelated changes.
 
-## Decisions requiring approval
+## Approved decisions (2026-10-20)
+
+1. Logs only first; metrics, alarms, and deployment sources stay synthetic.
+2. One account and region, an operator allowlist of log groups, and `FilterLogEvents` as the only
+   API.
+3. Limits: 3 pages, 100 events, 64 KiB of raw log text read, a 4-second adapter deadline, one SDK
+   attempt with 1 s connect and 2 s read timeouts. Sanitized text is further limited to 300
+   characters per event.
+4. Incomplete collection is a new `truncated` source status; the report becomes `partial` with an
+   uncertainty.
+5. Only structured JSON logs with a `level` field establish abnormal signals; free text is context.
+6. Other tools stay synthetic, and reports mark each source `fixture` or `live` and disclose mixing.
+7. Live evidence is not sent to a real model unless `ALLOW_LIVE_EVIDENCE_TO_MODEL=1`; startup fails
+   closed otherwise.
+
+## Decisions that were required (resolved above)
 
 - Approve logs-only first, or include metrics/alarms (which expands IAM and scope).
 - Approve one-account/region allowlist configuration and `FilterLogEvents` as the sole API.
