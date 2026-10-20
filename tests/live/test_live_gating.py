@@ -8,6 +8,7 @@ from botocore.exceptions import ProfileNotFound, TokenRetrievalError
 from live_support import (
     LIVE_PASS_THRESHOLD,
     credentials_skip_reason,
+    live_provider,
     live_settings,
     live_skip_reason,
 )
@@ -32,6 +33,28 @@ def test_live_tests_skip_with_a_clear_reason(environ: dict, reason: str) -> None
     assert live_skip_reason(environ).startswith(reason)
 
 
+ANTHROPIC = {
+    "RUN_LIVE_TESTS": "1",
+    "AI_PROVIDER": "anthropic",
+    "AI_MODEL": "example-model",
+    "ANTHROPIC_API_KEY": "sk-ant-" + "k" * 40,
+}
+
+
+def test_anthropic_live_tests_need_a_key_but_not_a_region() -> None:
+    assert live_skip_reason(ANTHROPIC) is None
+    assert live_skip_reason({**ANTHROPIC, "ANTHROPIC_API_KEY": ""}) == (
+        "ANTHROPIC_API_KEY is not set"
+    )
+    assert live_skip_reason({**ANTHROPIC, "AI_MODEL": ""}).startswith("AI_MODEL is not set")
+
+
+def test_live_provider_defaults_to_bedrock() -> None:
+    assert live_provider({}) == "bedrock"
+    assert live_provider({"AI_PROVIDER": "mock"}) == "bedrock"
+    assert live_provider({"AI_PROVIDER": " Anthropic "}) == "anthropic"
+
+
 def test_complete_configuration_enables_live_tests() -> None:
     assert live_skip_reason(CONFIGURED) is None
     assert (
@@ -40,7 +63,7 @@ def test_complete_configuration_enables_live_tests() -> None:
     )
 
 
-def test_live_settings_force_bedrock_model_orchestrator_without_trace_files() -> None:
+def test_live_settings_force_the_model_orchestrator_without_trace_files() -> None:
     settings = live_settings({**CONFIGURED, "AI_PROVIDER": "mock", "TRACE_DIR": "/tmp/x"})
 
     assert (settings.provider, settings.orchestrator, settings.trace_dir) == (
@@ -109,3 +132,13 @@ def test_unloadable_credentials_skip_with_login_hint(session) -> None:
 
     assert reason.startswith("AWS credentials could not be loaded (")
     assert "aws sso login" in reason
+
+
+def test_anthropic_live_settings_use_the_anthropic_provider() -> None:
+    settings = live_settings({**ANTHROPIC, "TRACE_DIR": "/tmp/x"})
+
+    assert (settings.provider, settings.orchestrator, settings.trace_dir) == (
+        "anthropic",
+        "model",
+        None,
+    )

@@ -7,6 +7,9 @@ All notable project changes are recorded here. The format follows
 
 ### Added
 
+- Direct Anthropic API model provider: `AI_PROVIDER=anthropic` with `AI_MODEL` and
+  `ANTHROPIC_API_KEY`, reusing the model orchestrator, validation, and stable error codes
+  (ADR-018). Live tests follow `AI_PROVIDER`.
 - Optional API-key authentication: set `SERVICE_API_KEY` to require an `X-API-Key` header on `/v1/`
   requests (401 otherwise), and a 32 KiB request-body limit (413) (SEC-6, SEC-7, ADR-017).
 

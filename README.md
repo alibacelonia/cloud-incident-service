@@ -101,14 +101,15 @@ Copy `.env.example` for reference; settings are read from environment variables.
 
 | Variable | Values | Default |
 | --- | --- | --- |
-| `AI_PROVIDER` | `mock` or `bedrock` | `mock` |
-| `AI_MODEL` | Bedrock model or inference profile ID; required for `bedrock` | empty |
+| `AI_PROVIDER` | `mock`, `bedrock`, or `anthropic` | `mock` |
+| `AI_MODEL` | Model ID: a Bedrock model or inference profile ID, or an Anthropic API model name; required for `bedrock` and `anthropic` | empty |
+| `ANTHROPIC_API_KEY` | Anthropic API key, 20–512 ASCII characters without whitespace; required for `anthropic`, never logged or traced | unset |
 | `AWS_REGION` | AWS region such as `us-east-1`; required for `bedrock` (`AWS_DEFAULT_REGION` is accepted as a fallback) | unset |
 | `ORCHESTRATOR` | `deterministic` or `model` | `deterministic` |
 | `MODEL_MAX_OUTPUT_TOKENS` | Output-token cap per model turn, 256–8192 | `2048` |
 | `TRACE_DIR` | Directory for investigation trace files, for example `.traces` (git-ignored); created at startup if missing | unset (no trace files) |
 | `SERVICE_API_KEY` | Secret that callers must send in the `X-API-Key` header, 32–256 ASCII characters without whitespace | unset (no authentication) |
-| `RUN_LIVE_TESTS` | `1` to enable live Bedrock tests | unset |
+| `RUN_LIVE_TESTS` | `1` to enable live model tests (Bedrock or Anthropic) | unset |
 
 Settings are validated at startup. If any value is invalid, uvicorn exits with
 `Application startup failed` and a message naming each offending variable (values are never
@@ -132,6 +133,25 @@ Set `AI_PROVIDER=bedrock`, `AI_MODEL`, and `AWS_REGION`, and provide credentials
 default AWS credential chain (for example `AWS_PROFILE`). Use an account you are authorized to use,
 enable model access for the model, and grant only the permissions in
 [docs/iam/](docs/iam/) (`bedrock:InvokeModel` on that model).
+
+### Using the Anthropic API directly
+
+Set `AI_PROVIDER=anthropic`, `AI_MODEL=<model name>` (for example `claude-haiku-5-5`) and
+`ANTHROPIC_API_KEY=<key>` from the [Anthropic Console](https://console.anthropic.com/), with
+`ORCHESTRATOR=model`. No AWS account or region is needed. The model path is identical to Bedrock's:
+the same tools, limits, validation, and repair, and a model-written answer is checked against the
+same rules. Billing goes to your Anthropic account.
+
+```bash
+export ANTHROPIC_API_KEY=<your-key>   # keep it out of version control
+AI_PROVIDER=anthropic AI_MODEL=claude-haiku-5-5 ORCHESTRATOR=model \
+  uv run uvicorn cloud_incident_service.main:app
+```
+
+Incident requests, tool evidence (already redacted), and the system prompt are sent to the
+Anthropic API when this provider is selected. Use it only with synthetic data or data you are
+allowed to share with Anthropic. The adapter sets no sampling temperature (the SDK no longer
+exposes one), so repeated runs can vary more than on Bedrock.
 
 ## API-key authentication
 
@@ -195,18 +215,27 @@ sources are cited, untrusted sources are never used as support or recommendation
 `sources`, and `safety` (no unregistered tool requests, every remediation requires approval). Add
 `--json` for the full report or `--min-pass-rate 0.8` to change the exit threshold (default 1.0).
 
-### Live Amazon Bedrock tests (opt-in)
+### Live model tests (opt-in)
 
 Live tests are deselected by default. They only invoke the configured model, cap output tokens,
-and are safe to rerun, but they incur Bedrock charges:
+and are safe to rerun, but they incur Bedrock or Anthropic charges:
 
 ```bash
 RUN_LIVE_TESTS=1 AI_MODEL=<model-or-inference-profile-id> AWS_REGION=<region> uv run pytest -m live -s
 ```
 
-Without `RUN_LIVE_TESTS=1`, a model ID, a region, or credentials, each live test is skipped with
-the reason. The suite runs a Converse smoke test, one model-driven investigation, and the full
-evaluation, which must pass at least 80% of scenarios (D-6). The CLI equivalent is:
+To test the Anthropic API instead, add `AI_PROVIDER=anthropic` and `ANTHROPIC_API_KEY`; no region
+is needed:
+
+```bash
+RUN_LIVE_TESTS=1 AI_PROVIDER=anthropic AI_MODEL=<model-name> ANTHROPIC_API_KEY=<key> \
+  uv run pytest -m live -s
+```
+
+Without `RUN_LIVE_TESTS=1`, a model ID, a region (Bedrock) or key (Anthropic), or usable
+credentials, each live test is skipped with the reason. The suite runs a smoke test, one
+model-driven investigation, and the full evaluation, which must pass at least 80% of scenarios
+(D-6). The CLI equivalent is:
 
 ```bash
 AI_PROVIDER=bedrock AI_MODEL=<model-id> AWS_REGION=<region> \

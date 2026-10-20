@@ -14,4 +14,8 @@ def create_model_client(settings: Settings | None = None) -> ModelClient | None:
         from cloud_incident_service.providers.bedrock import BedrockModelClient
 
         return BedrockModelClient(selected.model, selected.aws_region)
+    if selected.provider == "anthropic":
+        from cloud_incident_service.providers.anthropic import AnthropicModelClient
+
+        return AnthropicModelClient(selected.model, selected.anthropic_api_key)
     raise ProviderConfigurationError(f"AI_PROVIDER: unsupported provider {selected.provider!r}")

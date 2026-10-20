@@ -74,6 +74,7 @@ def traced_service(orchestrator=None, registry=None, sink=None) -> Investigation
     ("text", "kind"),
     [
         (f"key {CANARY_KEY} leaked", "aws_access_key_id"),
+        ("key sk-ant-api03-AbCdEfGhIjKlMnOpQrStUvWx leaked", "anthropic_api_key"),
         (f"account {CANARY_ACCOUNT}", "aws_account_id"),
         (f"arn:aws:iam::{CANARY_ACCOUNT}:role/x", "aws_account_id"),
         (f"contact {CANARY_EMAIL}", "email"),

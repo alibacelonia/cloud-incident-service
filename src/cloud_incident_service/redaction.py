@@ -12,6 +12,7 @@ from typing import Any
 from cloud_incident_service.domain import Evidence
 
 _PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
+    ("anthropic_api_key", re.compile(r"\bsk-ant-[A-Za-z0-9_-]{16,}")),
     ("aws_access_key_id", re.compile(r"\b(?:AKIA|ASIA|AGPA|AIDA|AROA|ANPA)[A-Z0-9]{16}\b")),
     (
         "aws_secret_access_key",

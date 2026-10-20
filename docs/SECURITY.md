@@ -20,10 +20,10 @@ document describes what the MVP protects against, how, and what it deliberately 
 
 | Requirement | Control | Where it is enforced and tested |
 | --- | --- | --- |
-| SEC-1 Read-only | The tool registry accepts only tools declared `read_only = True`; there are four fixture-backed read tools and no write path. The only AWS API the service calls is Bedrock model invocation, and only when `AI_PROVIDER=bedrock`. | `tools/registry.py`; `tests/test_tool_registry.py` |
+| SEC-1 Read-only | The tool registry accepts only tools declared `read_only = True`; there are four fixture-backed read tools and no write path. The only AWS API the service calls is Bedrock model invocation, and only when `AI_PROVIDER=bedrock`; with `AI_PROVIDER=anthropic` the only outbound call is the Anthropic Messages API. | `tools/registry.py`; `tests/test_tool_registry.py` |
 | SEC-2 Untrusted data | Tool output is sent to the model as JSON with an explicit untrusted-data note, the system prompt forbids following embedded instructions, unregistered tool calls are refused and traced, the model cites evidence by ID only, and evidence that resembles instructions is flagged and never recommended. | `orchestration/model.py`, `prompts/investigation_v4.txt`, `orchestration/findings.py`; prompt-injection evaluation scenario, `tests/test_model_orchestrator.py` |
 | SEC-3 Human control | Remediation proposals are data with `requires_human_approval` fixed to `true`; no endpoint or tool executes them. | `domain/report.py`; `tests/test_domain_report.py`, evaluation safety check |
-| SEC-4 Secrets | Credentials come only from the environment or the AWS default credential chain. Tool output, reported symptoms, and exported traces are redacted for AWS access key IDs, 12-digit account IDs, email addresses, bearer tokens, and string values under secret-looking keys. Logs record codes and identifiers, not payloads. | `redaction.py`, `tools/registry.py`, `application/investigation.py`; canary test in `tests/test_tracing.py` |
+| SEC-4 Secrets | Credentials come only from the environment (`ANTHROPIC_API_KEY`, `SERVICE_API_KEY`) or the AWS default credential chain; provider keys are held as secrets and never logged, traced, or echoed, and `sk-ant-` keys are redacted from evidence and traces. Tool output, reported symptoms, and exported traces are redacted for AWS access key IDs, 12-digit account IDs, email addresses, bearer tokens, and string values under secret-looking keys. Logs record codes and identifiers, not payloads. | `redaction.py`, `tools/registry.py`, `application/investigation.py`; canary test in `tests/test_tracing.py` |
 | SEC-5 Synthetic data | A hygiene test fails if fixtures contain 12-digit numbers, access key patterns, or email and URL domains outside reserved example domains. | `tests/test_fixture_hygiene.py` |
 | SEC-6 Input bounds | Every request field has a type, pattern, or length limit; unknown fields are rejected; the time window is at most 24 hours. | `domain/request.py`; `tests/test_domain_request.py` |
 | SEC-7 Access control | Optional shared API key checked in constant time before the body is read; keys are never logged or traced, and key settings are validated without echoing the value. | `api_security.py`, `config.py`; `tests/test_api_security.py` |
@@ -45,6 +45,16 @@ account or resource identifiers.
   outcomes, but not evidence text or the arguments of refused calls. Retention is manual; keep the
   directory out of version control (`.traces/` is git-ignored).
 - **Logs** contain investigation IDs, tool names, statuses, and error codes.
+
+## Anthropic API usage
+
+- `AI_PROVIDER=anthropic` sends the incident request, redacted tool evidence, and the system prompt
+  to the Anthropic API. Use it only with synthetic data or data you may share with Anthropic, and
+  review Anthropic's data-retention terms for your account first.
+- Create a dedicated API key for this project, supply it only through `ANTHROPIC_API_KEY`, and
+  revoke it in the Anthropic Console if it is ever exposed. Spend limits can be set there.
+- Calls use connect and read timeouts, at most two retries, and the same call, turn, time, and
+  output-token limits as Bedrock. Failures return the same stable `provider_*` codes.
 
 ## AWS usage
 

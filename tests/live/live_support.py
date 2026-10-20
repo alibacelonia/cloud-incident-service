@@ -1,4 +1,4 @@
-"""Opt-in rules for live Amazon Bedrock tests (NFR-3, D-6)."""
+"""Opt-in rules for live model tests against Amazon Bedrock or the Anthropic API (NFR-3, D-6)."""
 
 from __future__ import annotations
 
@@ -17,14 +17,28 @@ SMOKE_MAX_OUTPUT_TOKENS = 64
 INVESTIGATION_MAX_OUTPUT_TOKENS = 2_048
 
 
+def live_provider(environ: Mapping[str, str]) -> str:
+    """`anthropic` when AI_PROVIDER says so; otherwise Bedrock, as before the Anthropic client."""
+    return (
+        "anthropic" if environ.get("AI_PROVIDER", "").strip().lower() == "anthropic" else "bedrock"
+    )
+
+
 def live_skip_reason(environ: Mapping[str, str]) -> str | None:
     """Why live tests cannot run with this environment, or None when they can."""
     if environ.get("RUN_LIVE_TESTS") != "1":
-        return "live tests are disabled; set RUN_LIVE_TESTS=1 to run them against Amazon Bedrock"
+        return (
+            "live tests are disabled; set RUN_LIVE_TESTS=1 to run them against a live model "
+            "(Amazon Bedrock, or the Anthropic API with AI_PROVIDER=anthropic)"
+        )
+    provider = live_provider(environ)
     if not environ.get("AI_MODEL", "").strip():
-        return "AI_MODEL is not set; use a Bedrock model or inference profile ID you may invoke"
-    if not (environ.get("AWS_REGION") or environ.get("AWS_DEFAULT_REGION") or "").strip():
-        return "AWS_REGION is not set"
+        return f"AI_MODEL is not set; use a model ID you may invoke on {provider}"
+    if provider == "bedrock":
+        if not (environ.get("AWS_REGION") or environ.get("AWS_DEFAULT_REGION") or "").strip():
+            return "AWS_REGION is not set"
+    elif not environ.get("ANTHROPIC_API_KEY", "").strip():
+        return "ANTHROPIC_API_KEY is not set"
     try:
         live_settings(environ)
     except ConfigurationError as exc:
@@ -54,7 +68,7 @@ def credentials_skip_reason(session: Any) -> str | None:
 
 
 def live_settings(environ: Mapping[str, str]) -> Settings:
-    """Settings for live runs: always Bedrock and the model orchestrator."""
+    """Settings for live runs: the live provider and the model orchestrator, no trace files."""
     return Settings.from_environment(
-        {**environ, "AI_PROVIDER": "bedrock", "ORCHESTRATOR": "model", "TRACE_DIR": ""}
+        {**environ, "AI_PROVIDER": live_provider(environ), "ORCHESTRATOR": "model", "TRACE_DIR": ""}
     )

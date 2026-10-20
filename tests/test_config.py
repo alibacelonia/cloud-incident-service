@@ -19,7 +19,7 @@ def test_unknown_provider_names_variable_without_echoing_value() -> None:
     with pytest.raises(ConfigurationError) as raised:
         Settings.from_environment({"AI_PROVIDER": "secret-looking-value"})
 
-    assert raised.value.errors == ["AI_PROVIDER: Input should be 'mock' or 'bedrock'"]
+    assert raised.value.errors == ["AI_PROVIDER: Input should be 'mock', 'bedrock' or 'anthropic'"]
     assert "secret-looking-value" not in str(raised.value)
 
 
