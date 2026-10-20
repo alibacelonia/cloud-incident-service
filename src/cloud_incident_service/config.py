@@ -5,7 +5,15 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    SecretStr,
+    ValidationError,
+    field_validator,
+    model_validator,
+)
 
 # Maps settings fields to the environment variables they are read from.
 ENVIRONMENT_VARIABLES: dict[str, str] = {
@@ -15,7 +23,12 @@ ENVIRONMENT_VARIABLES: dict[str, str] = {
     "trace_dir": "TRACE_DIR",
     "orchestrator": "ORCHESTRATOR",
     "model_max_output_tokens": "MODEL_MAX_OUTPUT_TOKENS",
+    "service_api_key": "SERVICE_API_KEY",
 }
+
+
+MIN_API_KEY_LENGTH = 32
+MAX_API_KEY_LENGTH = 256
 
 
 class ConfigurationError(RuntimeError):
@@ -37,6 +50,23 @@ class Settings(BaseModel):
     orchestrator: Literal["deterministic", "model"] = "deterministic"
     # A-7: output-token cap for each model turn.
     model_max_output_tokens: int = Field(default=2_048, ge=256, le=8_192)
+    # SEC-7: when set, /v1/ requests need a matching X-API-Key header (ADR-017).
+    service_api_key: SecretStr | None = None
+
+    @field_validator("service_api_key")
+    @classmethod
+    def _check_service_api_key(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is None:
+            return value
+        secret = value.get_secret_value()
+        if not MIN_API_KEY_LENGTH <= len(secret) <= MAX_API_KEY_LENGTH or not secret.isascii():
+            raise ValueError(
+                f"must be {MIN_API_KEY_LENGTH}-{MAX_API_KEY_LENGTH} ASCII characters; "
+                'generate one with python3 -c "import secrets; print(secrets.token_urlsafe(32))"'
+            )
+        if any(char.isspace() for char in secret):
+            raise ValueError("must not contain whitespace")
+        return value
 
     @field_validator("trace_dir", mode="before")
     @classmethod
@@ -64,6 +94,7 @@ class Settings(BaseModel):
                 ("trace_dir", env.get("TRACE_DIR", "").strip()),
                 ("orchestrator", env.get("ORCHESTRATOR", "").strip().lower()),
                 ("model_max_output_tokens", env.get("MODEL_MAX_OUTPUT_TOKENS", "").strip()),
+                ("service_api_key", env.get("SERVICE_API_KEY", "").strip()),
             )
             if value
         }

@@ -19,8 +19,9 @@ uv sync --extra dev
 uv run uvicorn cloud_incident_service.main:app --reload
 ```
 
-The server listens on `127.0.0.1:8000`. Keep it there: the API has no authentication (see
-[docs/SECURITY.md](docs/SECURITY.md)). Check that it is ready:
+The server listens on `127.0.0.1:8000`. Keep it there unless you set `SERVICE_API_KEY` (see
+[API-key authentication](#api-key-authentication) and [docs/SECURITY.md](docs/SECURITY.md)); without
+a key the API is unauthenticated. Check that it is ready:
 
 ```bash
 curl http://localhost:8000/health
@@ -106,6 +107,7 @@ Copy `.env.example` for reference; settings are read from environment variables.
 | `ORCHESTRATOR` | `deterministic` or `model` | `deterministic` |
 | `MODEL_MAX_OUTPUT_TOKENS` | Output-token cap per model turn, 256–8192 | `2048` |
 | `TRACE_DIR` | Directory for investigation trace files, for example `.traces` (git-ignored); created at startup if missing | unset (no trace files) |
+| `SERVICE_API_KEY` | Secret that callers must send in the `X-API-Key` header, 32–256 ASCII characters without whitespace | unset (no authentication) |
 | `RUN_LIVE_TESTS` | `1` to enable live Bedrock tests | unset |
 
 Settings are validated at startup. If any value is invalid, uvicorn exits with
@@ -118,6 +120,8 @@ Failures return a JSON body with a stable `code` and a safe `detail`:
 
 | Status | Codes |
 | --- | --- |
+| 401 | `unauthorized` (missing, wrong, or duplicated `X-API-Key`) |
+| 413 | `request_too_large` (body over 32 KiB) |
 | 503 | `configuration_invalid`, `provider_credentials_unavailable`, `provider_credentials_invalid`, `provider_access_denied`, `provider_throttled`, `provider_unavailable`, `provider_unreachable` |
 | 502 | `provider_request_rejected` (for example an unknown `AI_MODEL`), `provider_response_invalid`, `provider_request_failed`, `invalid_model_output`, `model_turn_limit` |
 | 504 | `model_timeout` |
@@ -128,6 +132,30 @@ Set `AI_PROVIDER=bedrock`, `AI_MODEL`, and `AWS_REGION`, and provide credentials
 default AWS credential chain (for example `AWS_PROFILE`). Use an account you are authorized to use,
 enable model access for the model, and grant only the permissions in
 [docs/iam/](docs/iam/) (`bedrock:InvokeModel` on that model).
+
+## API-key authentication
+
+Set `SERVICE_API_KEY` to require a key on every `/v1/` request. `/health`, `/docs`, and
+`/openapi.json` stay open. Without the variable the API stays open, as in the quick start, and
+startup logs a warning.
+
+```bash
+# 1. Generate a key (43 characters) and keep it out of version control.
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"
+
+# 2. Start the server with the key.
+SERVICE_API_KEY=<your-key> uv run uvicorn cloud_incident_service.main:app
+
+# 3. Send it in the X-API-Key header. Without it the response is 401.
+curl -s -X POST http://localhost:8000/v1/investigations \
+  -H 'content-type: application/json' -H "X-API-Key: <your-key>" \
+  -d '{"service":"payments-api","environment":"production","symptoms":"Elevated 5xx errors","time_range":{"start":"2026-10-19T10:00:00Z","end":"2026-10-19T11:00:00Z"}}'
+```
+
+Keys are compared in constant time and are never logged or traced. To rotate a key, restart the
+server with a new value. Authentication is checked before the body is read, and request bodies over
+32 KiB are rejected with 413. This is a single shared key, not user accounts: use TLS in front of
+the service before exposing it beyond localhost.
 
 ## Investigation traces
 

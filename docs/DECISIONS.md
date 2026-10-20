@@ -112,7 +112,7 @@
 
 ## ADR-014: Local-only, unauthenticated MVP API
 
-- **Status:** accepted (2026-10-19; implements D-5, SEC-7)
+- **Status:** accepted (2026-10-19; implements D-5, SEC-7); partly superseded by ADR-017, which adds optional API-key authentication
 - **Context:** `AGENTS.md` requires authorization boundaries to be validated, but the MVP is a single-user portfolio service that runs on a developer machine against synthetic data, with no deployment target (`deployment.provider: local`).
 - **Decision:** The MVP API has no authentication or authorization. It is documented to run only on `127.0.0.1` (the uvicorn default), and `docs/SECURITY.md` lists authentication, authorization, TLS, edge rate and size limits, audit logging, and managed secrets as prerequisites for any non-local deployment. The remaining boundaries are enforced in code: input validation, the read-only tool registry, approval-gated remediation, and redaction.
 - **Consequences:** No identity or tenancy code is written speculatively. Anyone who can reach the port can run investigations and spend Bedrock tokens when the model orchestrator is enabled, which is why the service must not be exposed. Adding authentication later is a contained change at the FastAPI boundary.
@@ -142,3 +142,14 @@
 - **Consequences:** Live logs can extend the portfolio while preserving the current boundaries.
   Metrics, alarms, cross-account discovery, writes, and production deployment remain deferred.
   No AWS/IAM changes or paid tests are authorized by this proposal.
+
+## ADR-017: Optional shared API key and request-size limit
+
+- **Status:** accepted (2026-10-20; implements SEC-6, SEC-7; partly supersedes ADR-014)
+- **Context:** ADR-014 left the API unauthenticated and local-only. Operating beyond localhost, even on a trusted network, needs at least a credential, and anyone reaching the port could spend model tokens when the model orchestrator is enabled. The owner chose that unset keys keep the API open so the README quick start and local development are unchanged.
+- **Decision:**
+  - `SERVICE_API_KEY` (32–256 ASCII characters, no whitespace, held as a `SecretStr`) enables authentication. When set, every `/v1/` request needs exactly one matching `X-API-Key` header; `/health`, `/docs` and `/openapi.json` stay open. Startup logs a warning when it is unset.
+  - Enforcement is a pure ASGI middleware, not a route dependency, so an unauthenticated caller gets 401 before the body is read or validated (a dependency would let malformed JSON return 422 first). The OpenAPI schema declares the key through `APIKeyHeader` so `/docs` can send it.
+  - Keys are compared as SHA-256 digests with `hmac.compare_digest`, so length and prefix do not leak through timing. Rejections log only a fixed message. Invalid key settings name the variable and never the value.
+  - Request bodies over 32 KiB return 413, checked from `Content-Length` and again while streaming. The streaming signal is a `BaseException` because FastAPI converts any `Exception` raised while reading the body into a generic 400.
+- **Consequences:** A shared key authenticates callers but gives no per-user identity, authorization, rate limiting, or rotation without a restart; those remain prerequisites for a real deployment, and approval workflows (P-01) still need user identity. The middleware reads settings on each `/v1/` request, like the rest of the service, so tests and operators change behaviour through the environment.

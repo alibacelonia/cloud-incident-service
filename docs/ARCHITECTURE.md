@@ -38,6 +38,7 @@ Evaluation runner (evaluation/) -> InvestigationService over fixtures/evaluation
 
 | Module | Responsibility |
 | --- | --- |
+| `api_security.py` | ASGI middleware for `/v1/`: optional constant-time API-key check before the body is read (SEC-7) and a 32 KiB body limit that also covers chunked uploads (SEC-6) (ADR-017) |
 | `main.py` | `GET /health` and `POST /v1/investigations`; dependency wiring; startup validation (lifespan); mapping of typed errors to HTTP responses |
 | `config.py` | `Settings` from environment variables; `ConfigurationError` names variables, never values (ADR-008) |
 | `domain/` | Request, evidence, tool result, and report models; FR-5 cross-reference validators. `Findings` is what an orchestrator concludes; `IncidentReport` adds identity, request, provenance, and request-scoped checks |
@@ -102,6 +103,8 @@ Evaluation runner (evaluation/) -> InvestigationService over fixtures/evaluation
 
 | Situation | Result |
 | --- | --- |
+| Missing, wrong, or duplicated API key (when `SERVICE_API_KEY` is set) | 401 `unauthorized`; nothing executed |
+| Request body over 32 KiB | 413 `request_too_large` |
 | Invalid request | 422 with field errors; nothing executed |
 | One or more tools unavailable or malformed | 200 with `status: partial` |
 | Invalid settings | Startup fails; `/health` returns 503 `misconfigured`; requests return 503 `configuration_invalid` |
@@ -117,8 +120,8 @@ Evaluation runner (evaluation/) -> InvestigationService over fixtures/evaluation
 See `docs/SECURITY.md` for the full posture. In short: tools are read-only by construction,
 remediation is never executed, tool output is untrusted data, the model cannot introduce evidence,
 secrets are redacted where untrusted text enters, fixtures are synthetic, Bedrock access is limited
-to `bedrock:InvokeModel` on one model (`docs/iam/`), and the API has no authentication, so it must
-stay on `127.0.0.1` (D-5).
+to `bedrock:InvokeModel` on one model (`docs/iam/`), and the API can require a shared `X-API-Key` (ADR-017); without a key it
+must stay on `127.0.0.1` (D-5).
 
 ## Testing strategy
 
@@ -139,6 +142,6 @@ stay on `127.0.0.1` (D-5).
 
 ## Deployment approach
 
-Run with uvicorn on `127.0.0.1`. Amazon Bedrock is opt-in. Cloud deployment, real AWS data sources,
+Run with uvicorn on `127.0.0.1` (optionally with `SERVICE_API_KEY`). Amazon Bedrock is opt-in. Cloud deployment, real AWS data sources,
 a vector store, and background workers are out of scope for the MVP; any non-local deployment first
 requires authentication and the other prerequisites in `docs/SECURITY.md`.
