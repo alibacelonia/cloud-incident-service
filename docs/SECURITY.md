@@ -6,12 +6,13 @@ document describes what the MVP protects against, how, and what it deliberately 
 
 ## Deployment posture (D-5)
 
-- The API has **no authentication or authorization**. Run it only on your own machine, bound to
-  `127.0.0.1` (the uvicorn default). Do not start it with `--host 0.0.0.0` or put it behind a
-  public proxy.
-- Before any non-local deployment, add at least: authentication and authorization on every route,
-  TLS, request rate and size limits at the edge, audit logging, and managed secrets. None of these
-  exist in the MVP.
+- Authentication is **optional**: set `SERVICE_API_KEY` to require an `X-API-Key` header on every
+  `/v1/` request (ADR-017). Without it the API is unauthenticated: run it only on your own machine,
+  bound to `127.0.0.1` (the uvicorn default), never with `--host 0.0.0.0` or behind a public
+  proxy. Startup logs a warning when no key is set.
+- A single shared key is not authorization. Before any non-local deployment, also add TLS, per-user
+  identity and authorization, request rate limits at the edge, audit logging, and managed secrets.
+  Only the shared key and a 32 KiB request-body limit exist today.
 - All tool data is synthetic (`src/cloud_incident_service/fixtures/`). Never load real customer
   logs, confidential runbooks, or data from a client or employer AWS account.
 
@@ -25,7 +26,7 @@ document describes what the MVP protects against, how, and what it deliberately 
 | SEC-4 Secrets | Credentials come only from the environment or the AWS default credential chain. Tool output, reported symptoms, and exported traces are redacted for AWS access key IDs, 12-digit account IDs, email addresses, bearer tokens, and string values under secret-looking keys. Logs record codes and identifiers, not payloads. | `redaction.py`, `tools/registry.py`, `application/investigation.py`; canary test in `tests/test_tracing.py` |
 | SEC-5 Synthetic data | A hygiene test fails if fixtures contain 12-digit numbers, access key patterns, or email and URL domains outside reserved example domains. | `tests/test_fixture_hygiene.py` |
 | SEC-6 Input bounds | Every request field has a type, pattern, or length limit; unknown fields are rejected; the time window is at most 24 hours. | `domain/request.py`; `tests/test_domain_request.py` |
-| SEC-7 Access control | Not implemented; see the deployment posture above. | — |
+| SEC-7 Access control | Optional shared API key checked in constant time before the body is read; keys are never logged or traced, and key settings are validated without echoing the value. | `api_security.py`, `config.py`; `tests/test_api_security.py` |
 | SEC-8 Least privilege | IAM policy examples allow only `bedrock:InvokeModel` on the configured model. | `docs/iam/`; `tests/test_docs.py` |
 
 ## Model and cost bounds
@@ -62,7 +63,8 @@ account or resource identifiers.
 - Redaction and the instruction detector are pattern-based. They can miss novel secret formats or
   injection phrasing and can occasionally over-redact unusual identifiers; they are secondary
   controls behind the read-only registry and report validation.
-- There is no authentication, authorization, rate limiting, or multi-tenancy.
+- Authentication is a single optional shared key: no user identities, roles, key rotation without
+  a restart, rate limiting, or multi-tenancy.
 - Dependency auditing runs in CI and weekly using the locked dependency export. Dependabot
   proposes dependency and GitHub Actions updates; updates require review and passing checks.
   A clean audit only covers vulnerabilities known to the advisory service at scan time.

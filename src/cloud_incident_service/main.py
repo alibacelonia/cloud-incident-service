@@ -6,10 +6,12 @@ from contextlib import asynccontextmanager
 from functools import lru_cache
 from typing import Literal
 
-from fastapi import Depends, FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response, Security
 from fastapi.responses import JSONResponse
+from fastapi.security import APIKeyHeader
 from pydantic import BaseModel, Field
 
+from cloud_incident_service.api_security import API_KEY_HEADER, ApiGuardMiddleware
 from cloud_incident_service.application import InvestigationService
 from cloud_incident_service.config import ConfigurationError, Settings
 from cloud_incident_service.domain import IncidentReport, IncidentRequest
@@ -35,10 +37,19 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     logger.info(
         "Configuration valid: provider=%s orchestrator=%s", settings.provider, settings.orchestrator
     )
+    if settings.service_api_key is None:
+        logger.warning(
+            "SERVICE_API_KEY is not set: the API is unauthenticated. Keep it bound to 127.0.0.1."
+        )
+    else:
+        logger.info("API-key authentication is enabled")
     yield
 
 
 app = FastAPI(title="cloud-incident-service", version="0.1.0", lifespan=lifespan)
+app.add_middleware(ApiGuardMiddleware)
+# Documents the header in the OpenAPI schema; ApiGuardMiddleware enforces it (ADR-017).
+api_key_scheme = APIKeyHeader(name=API_KEY_HEADER, auto_error=False, scheme_name="ApiKeyAuth")
 
 
 class HealthResponse(BaseModel):
@@ -107,7 +118,8 @@ def get_investigation_service() -> InvestigationService:
 @app.post(
     "/v1/investigations",
     response_model=IncidentReport,
-    responses={code: {"model": ErrorResponse} for code in (502, 503, 504)},
+    responses={code: {"model": ErrorResponse} for code in (401, 413, 502, 503, 504)},
+    dependencies=[Security(api_key_scheme)],
 )
 async def create_investigation(
     request: IncidentRequest,
